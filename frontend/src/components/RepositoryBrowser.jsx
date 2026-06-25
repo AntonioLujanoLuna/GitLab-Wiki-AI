@@ -151,6 +151,7 @@ const styles = {
     fontWeight: 600,
     color: "var(--accent-rust)",
     whiteSpace: "nowrap",
+    cursor: "pointer",
   },
   hint: {
     fontFamily: "var(--font-serif)",
@@ -172,6 +173,7 @@ const styles = {
     fontSize: 14,
     fontWeight: 600,
     color: "#1A1410",
+    cursor: "pointer",
   },
   list: {
     listStyle: "none",
@@ -237,6 +239,7 @@ const styles = {
     color: "var(--text-secondary)",
     fontSize: 10.5,
     padding: "4px 8px",
+    cursor: "pointer",
   },
   deleteBtn: {
     background: "none",
@@ -244,6 +247,7 @@ const styles = {
     color: "var(--text-tertiary)",
     fontSize: 11,
     padding: "4px 6px",
+    cursor: "pointer",
   },
   errorBox: {
     background: "rgba(192,89,74,0.12)",

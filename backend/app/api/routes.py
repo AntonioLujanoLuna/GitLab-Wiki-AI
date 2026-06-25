@@ -15,8 +15,11 @@ Convención de rutas:
 """
 from __future__ import annotations
 
+import logging
 import openai
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
+
+logger = logging.getLogger(__name__)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,7 +30,7 @@ from app.models.schemas import (
     DependencyGraphResponse, IndexJobResponse, IndexRepositoryRequest, RepositorySummary,
     WikiPageDetail, WikiPageSummary, WikiStructureResponse,
 )
-from app.services.embedding_client import EmbeddingClient, EmbeddingError
+from app.services.embedding_client import EmbeddingError, get_embedding_client
 from app.services.indexer import run_index_job
 from app.services.vector_store import VectorStore
 from app.services.wiki_exporter import export_wiki_to_markdown
@@ -51,7 +54,7 @@ async def index_repository(
             select(Repository).where(
                 Repository.gitlab_url == payload.gitlab_url,
                 Repository.project_path == payload.project_path,
-            ).order_by(Repository.id.desc())
+            ).order_by(Repository.id.desc()).limit(1)
         )
     ).scalars().first()
 
@@ -182,8 +185,7 @@ async def search_code(repo_id: int, payload: CodeSearchRequest, session: AsyncSe
         )
 
     try:
-        embedding_client = EmbeddingClient()
-        query_vector = await embedding_client.embed_one(payload.query)
+        query_vector = await get_embedding_client().embed_one(payload.query)
     except EmbeddingError as e:
         raise HTTPException(status_code=502, detail=f"No se pudo generar el embedding de la búsqueda: {e}")
 
@@ -228,15 +230,14 @@ async def chat_with_repo(repo_id: int, payload: ChatRequest, session: AsyncSessi
     retrieved_chunks = []
     if repo.indexed_in_qdrant:
         try:
-            embedding_client = EmbeddingClient()
-            query_vector = await embedding_client.embed_one(payload.question)
+            query_vector = await get_embedding_client().embed_one(payload.question)
             vector_store = VectorStore(repo_id)
             try:
                 retrieved_chunks = await vector_store.search(query_vector)
             finally:
                 await vector_store.close()
         except EmbeddingError as e:
-            # Degradamos a responder solo con el wiki en vez de fallar la petición completa.
+            logger.warning("Embedding failed for chat query, falling back to wiki-only context: %s", e)
             retrieved_chunks = []
 
     generator = WikiGenerator()
@@ -274,4 +275,11 @@ async def delete_repository(repo_id: int, session: AsyncSession = Depends(get_se
         raise HTTPException(status_code=404, detail="Repositorio no encontrado")
     await session.delete(repo)
     await session.commit()
+    # Clean up Qdrant collection so vector data doesn't accumulate indefinitely
+    if repo.indexed_in_qdrant:
+        vector_store = VectorStore(repo_id)
+        try:
+            await vector_store.drop_collection()
+        finally:
+            await vector_store.close()
     return {"ok": True}
