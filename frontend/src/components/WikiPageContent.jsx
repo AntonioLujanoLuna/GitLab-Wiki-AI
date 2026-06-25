@@ -1,0 +1,267 @@
+import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import mermaid from "mermaid";
+
+mermaid.initialize({
+  startOnLoad: false,
+  theme: "dark",
+  themeVariables: {
+    background: "#201D17",
+    primaryColor: "#2A2620",
+    primaryTextColor: "#EDE8DC",
+    primaryBorderColor: "#C97C4A",
+    lineColor: "#8A5536",
+    secondaryColor: "#332E25",
+    tertiaryColor: "#201D17",
+    fontFamily: "JetBrains Mono, monospace",
+  },
+});
+
+let mermaidCounter = 0;
+
+function MermaidDiagram({ code }) {
+  const containerRef = useRef(null);
+  const [error, setError] = useState(null);
+  const idRef = useRef(null);
+  if (idRef.current === null) {
+    idRef.current = `mermaid-diagram-${mermaidCounter++}`;
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    mermaid
+      .render(idRef.current, code)
+      .then(({ svg }) => {
+        if (!cancelled && containerRef.current) {
+          containerRef.current.innerHTML = svg;
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [code]);
+
+  if (error) {
+    return (
+      <div style={styles.mermaidError}>
+        No se pudo renderizar el diagrama. <code>{error}</code>
+      </div>
+    );
+  }
+
+  return <div ref={containerRef} style={styles.mermaidContainer} />;
+}
+
+export function WikiPageContent({ page }) {
+  if (!page) return null;
+
+  return (
+    <article style={styles.article}>
+      <h1 style={styles.h1}>{page.title}</h1>
+
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          code({ inline, className, children, ...props }) {
+            const match = /language-(\w+)/.exec(className || "");
+            const lang = match?.[1];
+
+            if (!inline && lang === "mermaid") {
+              return <MermaidDiagram code={String(children).trim()} />;
+            }
+
+            if (!inline && lang) {
+              return (
+                <SyntaxHighlighter
+                  language={lang}
+                  style={vscDarkPlus}
+                  customStyle={{
+                    borderRadius: 8,
+                    fontSize: 12.5,
+                    border: "1px solid var(--border-subtle)",
+                    margin: "16px 0",
+                  }}
+                >
+                  {String(children).replace(/\n$/, "")}
+                </SyntaxHighlighter>
+              );
+            }
+
+            return (
+              <code style={styles.inlineCode} {...props}>
+                {children}
+              </code>
+            );
+          },
+          h2: (props) => <h2 style={styles.h2} {...props} />,
+          h3: (props) => <h3 style={styles.h3} {...props} />,
+          p: (props) => <p style={styles.p} {...props} />,
+          ul: (props) => <ul style={styles.list} {...props} />,
+          ol: (props) => <ol style={styles.list} {...props} />,
+          li: (props) => <li style={styles.li} {...props} />,
+          a: (props) => <a style={styles.link} {...props} target="_blank" rel="noreferrer" />,
+          blockquote: (props) => <blockquote style={styles.blockquote} {...props} />,
+          table: (props) => <table style={styles.table} {...props} />,
+          th: (props) => <th style={styles.th} {...props} />,
+          td: (props) => <td style={styles.td} {...props} />,
+        }}
+      >
+        {page.content_markdown}
+      </ReactMarkdown>
+
+      {page.source_files?.length > 0 && (
+        <div style={styles.sourcesBox}>
+          <div style={styles.sourcesLabel}>archivos fuente</div>
+          <div style={styles.sourcesList}>
+            {page.source_files.map((f) => (
+              <span key={f} style={styles.sourceTag}>
+                {f}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </article>
+  );
+}
+
+const styles = {
+  article: {
+    maxWidth: 720,
+    margin: "0 auto",
+    padding: "56px 32px 120px",
+  },
+  h1: {
+    fontFamily: "var(--font-serif)",
+    fontSize: 36,
+    fontWeight: 700,
+    color: "var(--text-primary)",
+    margin: "0 0 28px",
+    letterSpacing: "-0.01em",
+    lineHeight: 1.2,
+  },
+  h2: {
+    fontFamily: "var(--font-serif)",
+    fontSize: 23,
+    fontWeight: 600,
+    color: "var(--text-primary)",
+    margin: "40px 0 14px",
+    borderTop: "1px solid var(--border-subtle)",
+    paddingTop: 28,
+  },
+  h3: {
+    fontFamily: "var(--font-serif)",
+    fontSize: 18,
+    fontWeight: 600,
+    color: "var(--text-primary)",
+    margin: "28px 0 10px",
+  },
+  p: {
+    fontFamily: "var(--font-serif)",
+    fontSize: 16.5,
+    lineHeight: 1.75,
+    color: "var(--text-secondary)",
+    margin: "0 0 16px",
+  },
+  list: {
+    fontFamily: "var(--font-serif)",
+    fontSize: 16.5,
+    lineHeight: 1.75,
+    color: "var(--text-secondary)",
+    margin: "0 0 16px",
+    paddingLeft: 24,
+  },
+  li: {
+    marginBottom: 6,
+  },
+  link: {
+    color: "var(--accent-rust)",
+    textDecoration: "underline",
+    textDecorationColor: "var(--accent-rust-dim)",
+  },
+  blockquote: {
+    borderLeft: "3px solid var(--accent-rust)",
+    margin: "20px 0",
+    padding: "4px 0 4px 18px",
+    color: "var(--text-tertiary)",
+    fontStyle: "italic",
+    fontFamily: "var(--font-serif)",
+  },
+  inlineCode: {
+    background: "var(--bg-elevated-2)",
+    border: "1px solid var(--border-subtle)",
+    borderRadius: 4,
+    padding: "2px 6px",
+    fontSize: "0.85em",
+    fontFamily: "var(--font-mono)",
+    color: "var(--accent-rust)",
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    margin: "20px 0",
+    fontSize: 13.5,
+  },
+  th: {
+    textAlign: "left",
+    borderBottom: "1px solid var(--border-strong)",
+    padding: "8px 10px",
+    color: "var(--text-primary)",
+    fontFamily: "var(--font-mono)",
+  },
+  td: {
+    borderBottom: "1px solid var(--border-subtle)",
+    padding: "8px 10px",
+    color: "var(--text-secondary)",
+    fontFamily: "var(--font-serif)",
+  },
+  mermaidContainer: {
+    display: "flex",
+    justifyContent: "center",
+    background: "var(--bg-elevated)",
+    border: "1px solid var(--border-subtle)",
+    borderRadius: 8,
+    padding: "24px 12px",
+    margin: "20px 0",
+    overflowX: "auto",
+  },
+  mermaidError: {
+    fontSize: 12,
+    color: "var(--accent-red)",
+    background: "rgba(192,89,74,0.1)",
+    padding: 12,
+    borderRadius: 6,
+    margin: "16px 0",
+  },
+  sourcesBox: {
+    marginTop: 48,
+    paddingTop: 20,
+    borderTop: "1px solid var(--border-subtle)",
+  },
+  sourcesLabel: {
+    fontSize: 10.5,
+    letterSpacing: "0.06em",
+    color: "var(--text-tertiary)",
+    marginBottom: 10,
+  },
+  sourcesList: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  sourceTag: {
+    fontSize: 11,
+    fontFamily: "var(--font-mono)",
+    background: "var(--bg-elevated-2)",
+    border: "1px solid var(--border-subtle)",
+    borderRadius: 4,
+    padding: "3px 8px",
+    color: "var(--text-tertiary)",
+  },
+};
