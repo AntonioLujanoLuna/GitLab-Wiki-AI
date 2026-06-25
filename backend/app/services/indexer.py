@@ -30,18 +30,6 @@ from app.services.wiki_generator import FileSnippet, WikiGenerator
 
 logger = logging.getLogger(__name__)
 
-# Cuántos módulos principales reciben su propia página generada por IA.
-# El resto de módulos pequeños se mencionan solo en la página de arquitectura.
-MAX_MODULE_PAGES = 6
-# Cuántos archivos de muestra se leen por módulo para alimentar a la IA en la generación del wiki.
-SAMPLE_FILES_PER_MODULE = 6
-# Cuántos chunks de código se embeben por llamada al servicio de embeddings (batching).
-EMBEDDING_BATCH_SIZE = 32
-# Tope de archivos de código a leer e indexar en Qdrant (independiente del tope de listado del árbol).
-MAX_FILES_TO_EMBED = 300
-# Peticiones HTTP concurrentes al fetchar archivos del repo. Evita saturar el servidor GitLab.
-FETCH_CONCURRENCY = 15
-
 
 async def _update_job(session: AsyncSession, job: IndexJob, *, status: str | None = None,
                        progress: int | None = None, step: str | None = None,
@@ -167,7 +155,7 @@ async def _index_repository(session: AsyncSession, job: IndexJob, repo: Reposito
         await session.commit()
 
         # --- 7. Páginas por módulo principal ---
-        top_modules = [m for m in structure.modules if m.path != "."][:MAX_MODULE_PAGES]
+        top_modules = [m for m in structure.modules if m.path != "."][:settings.max_module_pages]
         progress_per_module = 15 // max(len(top_modules), 1)
         current_progress = 60
 
@@ -175,7 +163,7 @@ async def _index_repository(session: AsyncSession, job: IndexJob, repo: Reposito
             await _update_job(session, job, progress=current_progress, step=f"Generando página del módulo: {module.path}...")
 
             # Fetch all sample files for this module in parallel
-            sample_paths = module.sample_files[:SAMPLE_FILES_PER_MODULE]
+            sample_paths = module.sample_files[:settings.sample_files_per_module]
             sample_contents = await asyncio.gather(
                 *[client.get_file_content(project.id, fp, target_branch) for fp in sample_paths]
             )
@@ -256,9 +244,9 @@ async def _read_code_files(client: GitLabClient, project_id: str, branch: str, s
     code_paths = [
         p for p in structure.all_paths
         if any(p.lower().endswith(ext) for ext in EXTENSION_LANGUAGE)
-    ][:MAX_FILES_TO_EMBED]
+    ][:settings.max_files_to_embed]
 
-    semaphore = asyncio.Semaphore(FETCH_CONCURRENCY)
+    semaphore = asyncio.Semaphore(settings.fetch_concurrency)
 
     async def fetch_one(path: str) -> tuple[str, str] | None:
         async with semaphore:
@@ -268,7 +256,7 @@ async def _read_code_files(client: GitLabClient, project_id: str, branch: str, s
             return None
 
     results = await asyncio.gather(*[fetch_one(p) for p in code_paths])
-    return {path: content for result in results if result is not None for path, content in [result]}
+    return dict(r for r in results if r is not None)
 
 
 async def _embed_repository_code(file_contents: dict[str, str], repository_id: int) -> None:
@@ -285,8 +273,8 @@ async def _embed_repository_code(file_contents: dict[str, str], repository_id: i
     vector_store = VectorStore(repository_id)
     try:
         await vector_store.reset_collection()
-        for i in range(0, len(chunks), EMBEDDING_BATCH_SIZE):
-            batch = chunks[i:i + EMBEDDING_BATCH_SIZE]
+        for i in range(0, len(chunks), settings.embedding_batch_size):
+            batch = chunks[i:i + settings.embedding_batch_size]
             texts = [c.content for c in batch]
             try:
                 embeddings = await embedding_client.embed_batch(texts)

@@ -44,11 +44,11 @@ class EmbeddingClient:
             return []
 
         truncated = [text[:8000] for text in texts]
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         try:
             return await loop.run_in_executor(
                 None,
-                lambda: [self._model.get_text_embedding(t) for t in truncated],
+                lambda: self._model.get_text_embedding_batch(truncated),
             )
         except Exception as e:
             raise EmbeddingError(f"Error generando embeddings con HuggingFace: {e}") from e

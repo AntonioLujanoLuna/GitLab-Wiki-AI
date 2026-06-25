@@ -6,13 +6,13 @@ from app.core.config import settings
 from app.services.code_chunker import chunk_file
 
 # Generamos un archivo "largo" artificialmente: 200 líneas de ~50 chars cada una = ~10000 chars,
-# bastante por encima de chunk_max_chars (1500 por defecto) para forzar múltiples chunks.
+# bastante por encima de code_chunk_max_chars (1500 por defecto) para forzar múltiples chunks.
 lines = [f"def function_{i}():  # línea numero {i} de relleno" for i in range(200)]
 long_content = "\n".join(lines)
 
 print(f"Tamaño del archivo de prueba: {len(long_content)} chars")
-print(f"chunk_max_chars configurado: {settings.chunk_max_chars}")
-print(f"chunk_overlap_chars configurado: {settings.chunk_overlap_chars}")
+print(f"code_chunk_max_chars configurado: {settings.code_chunk_max_chars}")
+print(f"code_chunk_lines_overlap configurado: {settings.code_chunk_lines_overlap}")
 
 chunks = chunk_file("fake/long_file.py", long_content)
 print(f"\nChunks generados: {len(chunks)}")
@@ -21,7 +21,7 @@ assert len(chunks) > 1, "un archivo largo debe generar más de un chunk"
 
 for i, c in enumerate(chunks):
     print(f"  chunk {i}: líneas {c.start_line}-{c.end_line}, {len(c.content)} chars, chunk_index={c.chunk_index}")
-    assert len(c.content) <= settings.chunk_max_chars + 200, "ningún chunk debe exceder mucho el máximo configurado"
+    assert len(c.content) <= settings.code_chunk_max_chars + 200, "ningún chunk debe exceder mucho el máximo configurado"
     assert c.chunk_index == i
 
 # Verificar que hay overlap real: el final del chunk N debe aparecer también al inicio del chunk N+1
