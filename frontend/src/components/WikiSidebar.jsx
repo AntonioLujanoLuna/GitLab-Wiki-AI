@@ -112,6 +112,7 @@ const styles = {
     padding: 0,
     marginBottom: 14,
     display: "block",
+    cursor: "pointer",
   },
   repoName: {
     fontFamily: "var(--font-serif)",
@@ -169,6 +170,7 @@ const styles = {
     fontSize: 11.5,
     color: "var(--text-secondary)",
     textAlign: "left",
+    cursor: "pointer",
   },
   exportBtn: {
     marginTop: 6,
@@ -210,5 +212,6 @@ const styles = {
     fontSize: 12.5,
     fontFamily: "var(--font-mono)",
     lineHeight: 1.4,
+    cursor: "pointer",
   },
 };

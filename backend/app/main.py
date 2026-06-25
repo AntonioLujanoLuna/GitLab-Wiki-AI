@@ -4,8 +4,10 @@ Punto de entrada de la aplicación FastAPI.
 Para correr en desarrollo:
     uvicorn app.main:app --reload --port 8000
 
-Variables de entorno requeridas (ver .env.example):
-    ANTHROPIC_API_KEY
+Variables de entorno clave (ver .env.example):
+    OPENAI_URL          URL del servidor LLM compatible con OpenAI (local o remoto)
+    EMBEDDING_URL       URL del servicio de embeddings
+    QDRANT_HOST         Host del servidor Qdrant
 """
 from contextlib import asynccontextmanager
 
@@ -15,11 +17,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
 from app.core.config import settings
 from app.db.session import init_db
+from app.services.embedding_client import get_embedding_client
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    # Warm up the embedding model so the first search/chat request isn't slow
+    get_embedding_client()
     yield
 
 

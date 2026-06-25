@@ -3,22 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
-import mermaid from "mermaid";
-
-mermaid.initialize({
-  startOnLoad: false,
-  theme: "dark",
-  themeVariables: {
-    background: "#201D17",
-    primaryColor: "#2A2620",
-    primaryTextColor: "#EDE8DC",
-    primaryBorderColor: "#C97C4A",
-    lineColor: "#8A5536",
-    secondaryColor: "#332E25",
-    tertiaryColor: "#201D17",
-    fontFamily: "JetBrains Mono, monospace",
-  },
-});
+import mermaid from "../utils/mermaid";
 
 let mermaidCounter = 0;
 

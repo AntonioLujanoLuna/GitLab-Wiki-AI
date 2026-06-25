@@ -15,8 +15,11 @@ Convención de rutas:
 """
 from __future__ import annotations
 
+import logging
 import openai
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
+
+logger = logging.getLogger(__name__)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -234,7 +237,7 @@ async def chat_with_repo(repo_id: int, payload: ChatRequest, session: AsyncSessi
             finally:
                 await vector_store.close()
         except EmbeddingError as e:
-            # Degradamos a responder solo con el wiki en vez de fallar la petición completa.
+            logger.warning("Embedding failed for chat query, falling back to wiki-only context: %s", e)
             retrieved_chunks = []
 
     generator = WikiGenerator()

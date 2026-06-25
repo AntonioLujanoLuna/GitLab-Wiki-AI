@@ -1,21 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import mermaid from "mermaid";
+import mermaid from "../utils/mermaid";
 import { api } from "../api/client";
-
-mermaid.initialize({
-  startOnLoad: false,
-  theme: "dark",
-  themeVariables: {
-    background: "#201D17",
-    primaryColor: "#2A2620",
-    primaryTextColor: "#EDE8DC",
-    primaryBorderColor: "#C97C4A",
-    lineColor: "#8A5536",
-    secondaryColor: "#332E25",
-    tertiaryColor: "#201D17",
-    fontFamily: "JetBrains Mono, monospace",
-  },
-});
 
 /** Convierte un nombre de módulo (puede tener / y .) en un id válido para mermaid. */
 function sanitizeNodeId(name) {
@@ -169,6 +154,7 @@ const styles = {
     border: "none",
     color: "var(--text-tertiary)",
     fontSize: 14,
+    cursor: "pointer",
   },
   body: {
     flex: 1,

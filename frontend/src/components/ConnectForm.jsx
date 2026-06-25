@@ -147,6 +147,7 @@ const styles = {
     padding: 0,
     marginBottom: 20,
     display: "block",
+    cursor: "pointer",
   },
   eyebrow: {
     display: "flex",
@@ -226,6 +227,7 @@ const styles = {
     padding: "0 14px",
     fontSize: 12,
     color: "var(--text-secondary)",
+    cursor: "pointer",
   },
   submitBtn: {
     background: "var(--accent-rust)",
@@ -236,6 +238,7 @@ const styles = {
     fontWeight: 600,
     color: "#1A1410",
     marginTop: 8,
+    cursor: "pointer",
   },
   errorBox: {
     background: "rgba(192,89,74,0.12)",

@@ -2,17 +2,7 @@ import { useState } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { api } from "../api/client";
-
-function languageFromPath(path) {
-  const ext = path.split(".").pop()?.toLowerCase();
-  const map = {
-    js: "javascript", jsx: "jsx", ts: "typescript", tsx: "tsx", py: "python",
-    java: "java", go: "go", rs: "rust", rb: "ruby", php: "php", cs: "csharp",
-    cpp: "cpp", c: "c", h: "c", swift: "swift", kt: "kotlin", scala: "scala",
-    vue: "markup", sql: "sql", sh: "bash", yml: "yaml", yaml: "yaml", json: "json",
-  };
-  return map[ext] || "text";
-}
+import { languageFromPath } from "../utils/language";
 
 function ResultCard({ result }) {
   const [expanded, setExpanded] = useState(true);
@@ -161,6 +151,7 @@ const styles = {
     border: "none",
     color: "var(--text-tertiary)",
     fontSize: 14,
+    cursor: "pointer",
   },
   unavailable: {
     padding: "20px 16px",
@@ -195,6 +186,7 @@ const styles = {
     fontWeight: 600,
     color: "#1A1410",
     whiteSpace: "nowrap",
+    cursor: "pointer",
   },
   errorBox: {
     margin: "0 14px",

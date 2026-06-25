@@ -34,7 +34,6 @@ DEPENDENCY_MANIFESTS = {
     "Cargo.toml": "Rust / Cargo",
     "Gemfile": "Ruby / Bundler",
     "composer.json": "PHP / Composer",
-    "*.csproj": "C# / .NET",
 }
 
 IGNORED_DIR_PARTS = {

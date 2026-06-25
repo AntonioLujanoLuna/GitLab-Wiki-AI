@@ -3,18 +3,7 @@ import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { api } from "../api/client";
-
-/** Deriva un lenguaje aproximado para el resaltado de sintaxis a partir de la extensión del archivo. */
-function languageFromPath(path) {
-  const ext = path.split(".").pop()?.toLowerCase();
-  const map = {
-    js: "javascript", jsx: "jsx", ts: "typescript", tsx: "tsx", py: "python",
-    java: "java", go: "go", rs: "rust", rb: "ruby", php: "php", cs: "csharp",
-    cpp: "cpp", c: "c", h: "c", swift: "swift", kt: "kotlin", scala: "scala",
-    vue: "markup", sql: "sql", sh: "bash", yml: "yaml", yaml: "yaml", json: "json",
-  };
-  return map[ext] || "text";
-}
+import { languageFromPath } from "../utils/language";
 
 /** Un fragmento de código fuente usado como evidencia de una respuesta, colapsado por defecto. */
 function SourceExtract({ source }) {
@@ -173,6 +162,7 @@ const styles = {
     fontSize: 12.5,
     fontWeight: 600,
     boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+    cursor: "pointer",
   },
   panel: {
     position: "fixed",
@@ -205,6 +195,7 @@ const styles = {
     border: "none",
     color: "var(--text-tertiary)",
     fontSize: 13,
+    cursor: "pointer",
   },
   degradedBanner: {
     fontSize: 11,
@@ -270,6 +261,7 @@ const styles = {
     fontSize: 11,
     fontFamily: "var(--font-mono)",
     textAlign: "left",
+    cursor: "pointer",
   },
   sourceChevron: {
     color: "var(--text-tertiary)",
@@ -317,5 +309,6 @@ const styles = {
     fontSize: 12,
     fontWeight: 600,
     color: "#1A1410",
+    cursor: "pointer",
   },
 };
