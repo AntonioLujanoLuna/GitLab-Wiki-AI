@@ -16,10 +16,9 @@ Convención de rutas:
 from __future__ import annotations
 
 import logging
+
 import openai
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
-
-logger = logging.getLogger(__name__)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,6 +34,11 @@ from app.services.indexer import run_index_job
 from app.services.vector_store import VectorStore
 from app.services.wiki_exporter import export_wiki_to_markdown
 from app.services.wiki_generator import WikiGenerator
+
+logger = logging.getLogger(__name__)
+
+# Shared across requests — avoids creating a new AsyncOpenAI connection pool per chat call
+_wiki_generator = WikiGenerator()
 
 router = APIRouter(prefix="/api")
 
@@ -240,9 +244,8 @@ async def chat_with_repo(repo_id: int, payload: ChatRequest, session: AsyncSessi
             logger.warning("Embedding failed for chat query, falling back to wiki-only context: %s", e)
             retrieved_chunks = []
 
-    generator = WikiGenerator()
     try:
-        answer = await generator.answer_question_rag(
+        answer = await _wiki_generator.answer_question_rag(
             project_name=repo.name,
             question=payload.question,
             retrieved_chunks=retrieved_chunks,

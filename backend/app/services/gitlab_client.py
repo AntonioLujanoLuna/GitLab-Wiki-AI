@@ -8,10 +8,13 @@ y para que el resto del código no dependa de una librería externa pesada.
 from __future__ import annotations
 
 import base64
+import logging
 from dataclasses import dataclass
 from urllib.parse import quote
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 class GitLabAuthError(Exception):
@@ -86,8 +89,8 @@ class GitLabClient:
                 f"{self.api_url}/projects/{data['id']}/repository/branches/{quote(data['default_branch'], safe='')}"
             )
             last_commit_sha = branch_resp.json().get("commit", {}).get("id", "")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("No se pudo obtener el SHA del último commit para '%s': %s", project_path, e)
 
         return GitLabProject(
             id=str(data["id"]),

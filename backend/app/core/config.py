@@ -38,12 +38,17 @@ class Settings(BaseSettings):
     max_chat_tokens: int = 1200
 
     # --- Chunking de código para RAG ---
-    chunk_max_chars: int = 1500       # alias de code_chunk_max_chars; usado en tests
-    chunk_overlap_chars: int = 200    # superposición en chars (referencia para tests)
     rag_top_k: int = 6                # nº de chunks de código recuperados por pregunta
     code_chunk_lines: int = 40
     code_chunk_lines_overlap: int = 15
     code_chunk_max_chars: int = 1500
+
+    # --- Indexado / pipeline (sobreescribibles via .env) ---
+    max_module_pages: int = 6          # módulos principales que reciben página propia de IA
+    sample_files_per_module: int = 6   # archivos de muestra leídos por módulo para el prompt
+    embedding_batch_size: int = 32     # chunks por llamada al servicio de embeddings
+    max_files_to_embed: int = 300      # tope de archivos de código indexados en Qdrant
+    fetch_concurrency: int = 15        # peticiones HTTP paralelas al fetchar archivos del repo
 
     # --- Cache local de modelos HuggingFace ---
     models_cache_dir: str = str(Path.home() / ".cache" / "deepwiki" / "models")
