@@ -130,74 +130,73 @@ async def _index_repository(session: AsyncSession, job: IndexJob, repo: Reposito
         ]
 
         generator = WikiGenerator()
-
-        # Borrar páginas previas con una sola query DELETE en vez de N deletes individuales
-        await session.execute(delete(WikiPage).where(WikiPage.repository_id == repo.id))
-        await session.commit()
-
+        new_pages: list[WikiPage] = []
         order_counter = 0
 
-        # --- 5. Página: Overview ---
-        await _update_job(session, job, status=JobStatus.GENERATING.value, progress=45, step="Generando página: Overview...")
-        overview_md = await generator.generate_overview(project.name, structure, readme_content)
-        session.add(WikiPage(
-            repository_id=repo.id, slug="overview", title="Overview", order=order_counter,
-            content_markdown=overview_md, source_files=[structure.readme_path] if structure.readme_path else [],
-        ))
-        order_counter += 1
-        await session.commit()
-
-        # --- 6. Página: Arquitectura ---
-        await _update_job(session, job, progress=55, step="Generando página: Arquitectura...")
-        arch_md = await generator.generate_architecture(project.name, structure)
-        session.add(WikiPage(
-            repository_id=repo.id, slug="architecture", title="Arquitectura", order=order_counter,
-            content_markdown=arch_md, source_files=[m.path for m in structure.modules[:25]],
-        ))
-        order_counter += 1
-        await session.commit()
-
-        # --- 7. Páginas por módulo principal ---
-        top_modules = [m for m in structure.modules if m.path != "."][:settings.max_module_pages]
-        progress_per_module = 15 // max(len(top_modules), 1)
-        current_progress = 60
-
-        for module in top_modules:
-            await _update_job(session, job, progress=current_progress, step=f"Generando página del módulo: {module.path}...")
-
-            # Fetch all sample files for this module in parallel
-            sample_paths = module.sample_files[:settings.sample_files_per_module]
-            sample_contents = await asyncio.gather(
-                *[client.get_file_content(project.id, fp, target_branch) for fp in sample_paths]
-            )
-            snippets = [
-                FileSnippet(path=fp, content=c)
-                for fp, c in zip(sample_paths, sample_contents)
-                if c
-            ]
-
-            if not snippets:
-                current_progress += progress_per_module
-                continue
-
-            module_md = await generator.generate_module_page(project.name, module, snippets)
-            slug = "module-" + module.path.replace("/", "-").lower()
-            session.add(WikiPage(
-                repository_id=repo.id, slug=slug, title=f"Módulo: {module.path}", order=order_counter,
-                parent_slug="modules", content_markdown=module_md,
-                source_files=[s.path for s in snippets],
+        try:
+            # --- 5. Página: Overview ---
+            await _update_job(session, job, status=JobStatus.GENERATING.value, progress=45, step="Generando página: Overview...")
+            overview_md = await generator.generate_overview(project.name, structure, readme_content)
+            new_pages.append(WikiPage(
+                repository_id=repo.id, slug="overview", title="Overview", order=order_counter,
+                content_markdown=overview_md, source_files=[structure.readme_path] if structure.readme_path else [],
             ))
             order_counter += 1
-            await session.commit()
-            current_progress += progress_per_module
 
-        # --- 8. Página: Cómo ejecutar el proyecto ---
-        await _update_job(session, job, progress=80, step="Generando página: Cómo ejecutar el proyecto...")
-        setup_md = await generator.generate_setup_guide(project.name, structure, manifest_snippets, readme_content)
-        session.add(WikiPage(
-            repository_id=repo.id, slug="setup", title="Cómo ejecutar el proyecto", order=order_counter,
-            content_markdown=setup_md, source_files=structure.dependency_manifests,
-        ))
+            # --- 6. Página: Arquitectura ---
+            await _update_job(session, job, progress=55, step="Generando página: Arquitectura...")
+            arch_md = await generator.generate_architecture(project.name, structure)
+            new_pages.append(WikiPage(
+                repository_id=repo.id, slug="architecture", title="Arquitectura", order=order_counter,
+                content_markdown=arch_md, source_files=[m.path for m in structure.modules[:25]],
+            ))
+            order_counter += 1
+
+            # --- 7. Páginas por módulo principal ---
+            top_modules = [m for m in structure.modules if m.path != "."][:settings.max_module_pages]
+            progress_per_module = 15 // max(len(top_modules), 1)
+            current_progress = 60
+
+            for module in top_modules:
+                await _update_job(session, job, progress=current_progress, step=f"Generando página del módulo: {module.path}...")
+
+                sample_paths = module.sample_files[:settings.sample_files_per_module]
+                sample_contents = await asyncio.gather(
+                    *[client.get_file_content(project.id, fp, target_branch) for fp in sample_paths]
+                )
+                snippets = [
+                    FileSnippet(path=fp, content=c)
+                    for fp, c in zip(sample_paths, sample_contents)
+                    if c
+                ]
+
+                if snippets:
+                    module_md = await generator.generate_module_page(project.name, module, snippets)
+                    slug = "module-" + module.path.replace("/", "-").lower()
+                    new_pages.append(WikiPage(
+                        repository_id=repo.id, slug=slug, title=f"Módulo: {module.path}", order=order_counter,
+                        parent_slug="modules", content_markdown=module_md,
+                        source_files=[s.path for s in snippets],
+                    ))
+                    order_counter += 1
+
+                current_progress += progress_per_module
+
+            # --- 8. Página: Cómo ejecutar el proyecto ---
+            await _update_job(session, job, progress=80, step="Generando página: Cómo ejecutar el proyecto...")
+            setup_md = await generator.generate_setup_guide(project.name, structure, manifest_snippets, readme_content)
+            new_pages.append(WikiPage(
+                repository_id=repo.id, slug="setup", title="Cómo ejecutar el proyecto", order=order_counter,
+                content_markdown=setup_md, source_files=structure.dependency_manifests,
+            ))
+
+        finally:
+            await generator.close()
+
+        # Atomic swap: delete old pages and insert all new ones in a single commit.
+        # If anything above raised an exception, old pages are preserved (no delete ran).
+        await session.execute(delete(WikiPage).where(WikiPage.repository_id == repo.id))
+        session.add_all(new_pages)
         await session.commit()
 
         # --- 9. Lectura de archivos de código en paralelo (reutilizada por Qdrant y el grafo) ---

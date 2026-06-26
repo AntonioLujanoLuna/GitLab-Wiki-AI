@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 
 import openai
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,10 +37,11 @@ from app.services.wiki_generator import WikiGenerator
 
 logger = logging.getLogger(__name__)
 
-# Shared across requests — avoids creating a new AsyncOpenAI connection pool per chat call
-_wiki_generator = WikiGenerator()
-
 router = APIRouter(prefix="/api")
+
+
+def _get_wiki_generator(request: Request) -> WikiGenerator:
+    return request.app.state.wiki_generator
 
 
 @router.post("/repositories/index", response_model=IndexJobResponse)
@@ -208,7 +209,12 @@ async def search_code(repo_id: int, payload: CodeSearchRequest, session: AsyncSe
 
 
 @router.post("/repositories/{repo_id}/chat", response_model=ChatResponse)
-async def chat_with_repo(repo_id: int, payload: ChatRequest, session: AsyncSession = Depends(get_session)):
+async def chat_with_repo(
+    repo_id: int,
+    payload: ChatRequest,
+    session: AsyncSession = Depends(get_session),
+    wiki_generator: WikiGenerator = Depends(_get_wiki_generator),
+):
     """
     Responde una pregunta libre sobre el repositorio usando RAG:
     1. Embebe la pregunta del usuario.
@@ -237,19 +243,23 @@ async def chat_with_repo(repo_id: int, payload: ChatRequest, session: AsyncSessi
 
     retrieved_chunks = []
     if repo.indexed_in_qdrant:
+        query_vector = None
         try:
             query_vector = await get_embedding_client().embed_one(payload.question)
+        except EmbeddingError as e:
+            logger.warning("Embedding failed for chat query, falling back to wiki-only context: %s", e)
+
+        if query_vector is not None:
             vector_store = VectorStore(repo_id)
             try:
                 retrieved_chunks = await vector_store.search(query_vector)
+            except Exception:
+                logger.warning("Qdrant search failed for repo %s, falling back to wiki-only context", repo_id)
             finally:
                 await vector_store.close()
-        except EmbeddingError as e:
-            logger.warning("Embedding failed for chat query, falling back to wiki-only context: %s", e)
-            retrieved_chunks = []
 
     try:
-        answer = await _wiki_generator.answer_question_rag(
+        answer = await wiki_generator.answer_question_rag(
             project_name=repo.name,
             question=payload.question,
             retrieved_chunks=retrieved_chunks,
