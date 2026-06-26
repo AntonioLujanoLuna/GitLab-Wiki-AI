@@ -30,8 +30,8 @@ class Repository(Base):
     __tablename__ = "repositories"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    gitlab_url: Mapped[str] = mapped_column(String(512))          # base url, ej https://gitlab.com
-    project_path: Mapped[str] = mapped_column(String(512))         # ej grupo/subgrupo/proyecto
+    gitlab_url: Mapped[str] = mapped_column(String(512), index=True)
+    project_path: Mapped[str] = mapped_column(String(512), index=True)
     project_id: Mapped[str] = mapped_column(String(64))
     default_branch: Mapped[str] = mapped_column(String(128), default="main")
     name: Mapped[str] = mapped_column(String(256))
@@ -66,7 +66,7 @@ class WikiPage(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     repository_id: Mapped[int] = mapped_column(ForeignKey("repositories.id"))
-    slug: Mapped[str] = mapped_column(String(256))           # ej "overview", "module-auth"
+    slug: Mapped[str] = mapped_column(String(256), index=True)
     title: Mapped[str] = mapped_column(String(256))
     order: Mapped[int] = mapped_column(Integer, default=0)
     parent_slug: Mapped[str] = mapped_column(String(256), default="")  # para jerarquía en el sidebar

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import mermaid from "../utils/mermaid";
 import { api } from "../api/client";
 
@@ -25,17 +25,13 @@ function graphToMermaid(graph) {
   return lines.join("\n");
 }
 
-let diagramCounter = 0;
-
 export function DependencyGraphView({ repositoryId, onClose }) {
   const [graph, setGraph] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const containerRef = useRef(null);
-  const idRef = useRef(null);
-  if (idRef.current === null) {
-    idRef.current = `dep-graph-${diagramCounter++}`;
-  }
+  const rawId = useId();
+  const diagramId = `depgraph-${rawId.replace(/:/g, "")}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -65,7 +61,7 @@ export function DependencyGraphView({ repositoryId, onClose }) {
 
     let cancelled = false;
     mermaid
-      .render(idRef.current, code)
+      .render(diagramId, code)
       .then(({ svg }) => {
         if (!cancelled && containerRef.current) {
           containerRef.current.innerHTML = svg;

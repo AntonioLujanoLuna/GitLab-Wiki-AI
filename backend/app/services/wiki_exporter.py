@@ -13,12 +13,16 @@ quiere exportar a otro formato (PDF, HTML) reusando el mismo orden de secciones.
 """
 from __future__ import annotations
 
+import re
+import unicodedata
 from datetime import datetime, timezone
 
 
 def _slugify_anchor(title: str) -> str:
     """Genera un ancla de Markdown a partir de un título, igual que lo hacen GitHub/GitLab."""
-    return title.lower().replace(" ", "-").replace(":", "").replace("/", "")
+    normalized = unicodedata.normalize("NFD", title.lower())
+    ascii_only = normalized.encode("ascii", "ignore").decode()
+    return re.sub(r"[^\w\s-]", "", ascii_only).strip().replace(" ", "-")
 
 
 def export_wiki_to_markdown(repository, pages: list) -> str:

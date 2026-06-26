@@ -1,24 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import mermaid from "../utils/mermaid";
 
-let mermaidCounter = 0;
-
 function MermaidDiagram({ code }) {
   const containerRef = useRef(null);
   const [error, setError] = useState(null);
-  const idRef = useRef(null);
-  if (idRef.current === null) {
-    idRef.current = `mermaid-diagram-${mermaidCounter++}`;
-  }
+  const rawId = useId();
+  const diagramId = `mermaid-${rawId.replace(/:/g, "")}`;
 
   useEffect(() => {
     let cancelled = false;
     mermaid
-      .render(idRef.current, code)
+      .render(diagramId, code)
       .then(({ svg }) => {
         if (!cancelled && containerRef.current) {
           containerRef.current.innerHTML = svg;
@@ -53,15 +49,15 @@ export function WikiPageContent({ page }) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          code({ inline, className, children, ...props }) {
+          code({ className, children, ...props }) {
             const match = /language-(\w+)/.exec(className || "");
             const lang = match?.[1];
 
-            if (!inline && lang === "mermaid") {
+            if (lang === "mermaid") {
               return <MermaidDiagram code={String(children).trim()} />;
             }
 
-            if (!inline && lang) {
+            if (lang) {
               return (
                 <SyntaxHighlighter
                   language={lang}

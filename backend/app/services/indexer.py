@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from datetime import datetime, timezone
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +37,8 @@ async def _update_job(session: AsyncSession, job: IndexJob, *, status: str | Non
                        error: str | None = None) -> None:
     if status is not None:
         job.status = status
+        if status in (JobStatus.DONE.value, JobStatus.FAILED.value):
+            job.finished_at = datetime.now(timezone.utc)
     if progress is not None:
         job.progress = progress
     if step is not None:
