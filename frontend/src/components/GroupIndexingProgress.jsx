@@ -68,7 +68,7 @@ export function GroupIndexingProgress({ groupJobId, groupId, onDone }) {
       <div style={styles.card}>
         <div style={styles.eyebrow}>
           <span style={styles.dot} />
-          deepwiki-gitlab / indexando grupo
+          atlas / indexando grupo
         </div>
 
         <h2 style={styles.title}>Indexando grupo</h2>

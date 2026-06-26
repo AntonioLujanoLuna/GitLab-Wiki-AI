@@ -32,7 +32,7 @@ export function RepositoryBrowser({
       <div style={styles.card}>
         <div style={styles.eyebrow}>
           <span style={styles.dot} />
-          deepwiki-gitlab
+          atlas
         </div>
 
         {/* Tab bar */}

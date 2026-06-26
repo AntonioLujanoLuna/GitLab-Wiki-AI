@@ -34,7 +34,7 @@ export function GroupConnectForm({ onSubmit, isSubmitting, errorMessage, onBack,
         )}
         <div style={styles.eyebrow}>
           <span style={styles.dot} />
-          deepwiki-gitlab / {isReindex ? "reindexar grupo" : "nuevo grupo"}
+          atlas / {isReindex ? "reindexar grupo" : "nuevo grupo"}
         </div>
 
         <h1 style={styles.title}>{isReindex ? "Reindexar grupo" : "Indexar grupo de GitLab"}</h1>

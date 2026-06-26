@@ -1,5 +1,5 @@
 /**
- * Minimal HTTP client for the DeepWiki-GitLab backend.
+ * Minimal HTTP client for the Atlas backend.
  * Centralises the base URL, error handling, and retry logic (up to 2 retries
  * with exponential backoff on 5xx responses and network failures).
  */
