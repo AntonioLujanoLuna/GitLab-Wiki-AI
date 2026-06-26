@@ -12,6 +12,7 @@ duplicarlo.
 """
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass
 
@@ -20,6 +21,8 @@ from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from app.core.config import settings
 from app.services.code_chunker import CodeChunk
+
+logger = logging.getLogger(__name__)
 
 # Namespace fijo para generar UUIDs deterministas a partir de chunk_id (mismo input -> mismo UUID).
 _POINT_ID_NAMESPACE = uuid.UUID("a51e0e0a-3c2c-4f3b-9b8e-5a2f0a6e8d10")
@@ -57,7 +60,7 @@ class VectorStore:
         try:
             await self._client.delete_collection(self.collection_name)
         except Exception:
-            pass
+            logger.warning("No se pudo borrar la colección Qdrant '%s'", self.collection_name, exc_info=True)
 
     async def upsert_chunks(self, chunks: list[CodeChunk], embeddings: list[list[float]]) -> None:
         """Sube (o sobreescribe) los puntos correspondientes a una lista de chunks ya embebidos."""
@@ -92,8 +95,8 @@ class VectorStore:
                 limit=top_k,
             )
         except Exception:
-            # La colección puede no existir si el repo aún no se indexó con esta versión del código,
-            # o si Qdrant está caído. El llamador decide cómo degradar (ej. responder sin contexto de código).
+            logger.warning("Búsqueda en Qdrant fallida para colección '%s'; degradando a contexto sin código.",
+                           self.collection_name, exc_info=True)
             return []
 
         return [

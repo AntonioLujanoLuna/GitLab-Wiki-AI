@@ -56,8 +56,5 @@ class Settings(BaseSettings):
     # --- CORS ---
     cors_origins: list[str] = ["*"]
 
-    # --- Workspace temporal para clones ---
-    workspace_dir: str = "/tmp/deepwiki-gitlab-workspace"
-
 
 settings = Settings()

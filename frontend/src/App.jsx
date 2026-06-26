@@ -71,9 +71,9 @@ function App() {
 
   // --- Abrir directamente el wiki de un repo ya indexado, sin reindexar ---
   const openExistingRepository = async (repo) => {
-    setRepository(repo);
     try {
       const structure = await api.getWikiStructure(repo.id);
+      setRepository(repo);
       setPages(structure.pages);
       setActiveSlug(structure.pages[0]?.slug || null);
       setView(VIEW.WIKI);

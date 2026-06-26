@@ -223,13 +223,17 @@ async def chat_with_repo(repo_id: int, payload: ChatRequest, session: AsyncSessi
     if repo is None:
         raise HTTPException(status_code=404, detail="Repositorio no encontrado")
 
-    pages = (
-        await session.execute(select(WikiPage).where(WikiPage.repository_id == repo_id).order_by(WikiPage.order))
-    ).scalars().all()
-    if not pages:
+    page_rows = (
+        await session.execute(
+            select(WikiPage.title, WikiPage.content_markdown)
+            .where(WikiPage.repository_id == repo_id)
+            .order_by(WikiPage.order)
+        )
+    ).all()
+    if not page_rows:
         raise HTTPException(status_code=400, detail="Este repositorio aún no tiene wiki generado")
 
-    wiki_summary = "\n\n".join(f"## {p.title}\n{p.content_markdown[:500]}" for p in pages)
+    wiki_summary = "\n\n".join(f"## {title}\n{content[:500]}" for title, content in page_rows)
 
     retrieved_chunks = []
     if repo.indexed_in_qdrant:
