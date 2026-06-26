@@ -119,6 +119,10 @@ class DependencyGraphResponse(BaseModel):
     edges: list[GraphEdge] = []
 
 
+class WikiPageUpdate(BaseModel):
+    content_markdown: str = Field(..., min_length=0, max_length=500_000)
+
+
 class ChatResponse(BaseModel):
     answer: str
     sources: list[CodeSource] = []

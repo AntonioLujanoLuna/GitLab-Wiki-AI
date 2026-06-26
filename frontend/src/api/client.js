@@ -62,6 +62,12 @@ export const api = {
 
   getWikiPage: (repoId, slug) => request(`/api/repositories/${repoId}/wiki/${slug}`),
 
+  updateWikiPage: (repoId, slug, contentMarkdown) =>
+    request(`/api/repositories/${repoId}/wiki/${slug}`, {
+      method: "PATCH",
+      body: JSON.stringify({ content_markdown: contentMarkdown }),
+    }),
+
   askQuestion: (repoId, question) =>
     request(`/api/repositories/${repoId}/chat`, { method: "POST", body: JSON.stringify({ question }) }),
 

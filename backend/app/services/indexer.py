@@ -11,6 +11,7 @@ Este módulo es el que corre en background (FastAPI BackgroundTasks) y va:
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import os
 from datetime import datetime, timezone
@@ -24,7 +25,7 @@ from app.models.db_models import IndexJob, JobStatus, Repository, WikiPage
 from app.services.code_chunker import chunk_files
 from app.services.dependency_graph import build_dependency_graph
 from app.services.embedding_client import EmbeddingError, get_embedding_client
-from app.services.gitlab_client import GitLabAuthError, GitLabClient, GitLabNotFoundError
+from app.services.gitlab_client import GitLabAuthError, GitLabClient, GitLabNotFoundError, GitLabRateLimitError
 from app.services.structure_analyzer import EXTENSION_LANGUAGE, analyze_structure
 from app.services.vector_store import VectorStore
 from app.services.wiki_generator import FileSnippet, WikiGenerator
@@ -64,7 +65,7 @@ async def run_index_job(job_id: int, gitlab_url: str, project_path: str,
         try:
             await _index_repository(session, job, repo, gitlab_url, project_path, private_token,
                                      branch, force_reindex)
-        except (GitLabAuthError, GitLabNotFoundError) as e:
+        except (GitLabAuthError, GitLabNotFoundError, GitLabRateLimitError) as e:
             await _update_job(session, job, status=JobStatus.FAILED.value, error=str(e))
         except Exception as e:  # noqa: BLE001 - queremos capturar cualquier fallo y reportarlo al usuario
             logger.exception("Fallo indexando job %s", job_id)
@@ -220,14 +221,34 @@ async def _index_repository(session: AsyncSession, job: IndexJob, repo: Reposito
             repo.dependency_graph = {"nodes": [], "edges": []}
         await session.commit()
 
-        # --- 11. Indexado vectorial del código en Qdrant (para RAG en el chat) ---
-        # Un fallo aquí (Qdrant caído, servicio de embeddings caído) NO debe tirar todo el job:
-        # el wiki ya generado sigue siendo válido y útil aunque el chat con RAG no esté disponible.
+        # --- 11. Incremental vector indexing ---
+        # Failure here (Qdrant down, embedding service down) must NOT fail the job:
+        # the generated wiki is still valid and useful without RAG.
         await _update_job(session, job, status=JobStatus.EMBEDDING.value, progress=90,
                            step="Indexando código en Qdrant para búsqueda semántica...")
         try:
-            await _embed_repository_code(code_file_contents, repo.id)
-            repo.indexed_in_qdrant = True
+            new_hashes = _compute_file_hashes(code_file_contents)
+            old_hashes: dict[str, str] = repo.file_hashes or {}
+
+            changed_files = {p: c for p, c in code_file_contents.items() if new_hashes[p] != old_hashes.get(p)}
+            deleted_paths = set(old_hashes) - set(new_hashes)
+
+            if not changed_files and not deleted_paths:
+                logger.info("No code files changed since last embed for repo %s; skipping re-embedding.", repo.id)
+                repo.indexed_in_qdrant = True
+            else:
+                # Reset when files were deleted (chunks can't be removed by path) or on first indexing.
+                # Otherwise just upsert the changed files — unchanged file vectors remain valid.
+                full_reset = bool(deleted_paths) or not repo.indexed_in_qdrant
+                files_to_embed = code_file_contents if full_reset else changed_files
+                logger.info(
+                    "Embedding %d/%d files for repo %s (full_reset=%s, deleted=%d)",
+                    len(files_to_embed), len(code_file_contents), repo.id, full_reset, len(deleted_paths),
+                )
+                await _embed_repository_code(files_to_embed, repo.id, full_reset=full_reset)
+                repo.indexed_in_qdrant = True
+
+            repo.file_hashes = new_hashes
         except Exception:
             logger.exception("Fallo indexando código en Qdrant para repo %s (job %s); el wiki sigue disponible.",
                               repo.id, job.id)
@@ -261,10 +282,21 @@ async def _read_code_files(client: GitLabClient, project_id: str, branch: str, s
     return dict(r for r in results if r is not None)
 
 
-async def _embed_repository_code(file_contents: dict[str, str], repository_id: int) -> None:
+def _compute_file_hashes(file_contents: dict[str, str]) -> dict[str, str]:
+    return {
+        path: hashlib.sha256(content.encode(errors="replace")).hexdigest()
+        for path, content in file_contents.items()
+    }
+
+
+async def _embed_repository_code(
+    file_contents: dict[str, str], repository_id: int, *, full_reset: bool = True
+) -> None:
     """
-    Parte en chunks el contenido de código ya leído, lo embebe y lo sube a la colección
-    de Qdrant de este repositorio.
+    Chunks, embeds, and upserts code into the Qdrant collection for this repo.
+    When full_reset=True the collection is dropped and recreated first (needed when
+    files were deleted or on first indexing). When False, only the provided files are
+    upserted — existing vectors for unchanged files remain valid.
     """
     chunks = chunk_files(file_contents)
     if not chunks:
@@ -274,7 +306,8 @@ async def _embed_repository_code(file_contents: dict[str, str], repository_id: i
     embedding_client = get_embedding_client()
     vector_store = VectorStore(repository_id)
     try:
-        await vector_store.reset_collection()
+        if full_reset:
+            await vector_store.reset_collection()
         for i in range(0, len(chunks), settings.embedding_batch_size):
             batch = chunks[i:i + settings.embedding_batch_size]
             texts = [c.content for c in batch]

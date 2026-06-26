@@ -27,7 +27,7 @@ from app.models.db_models import IndexJob, JobStatus, Repository, WikiPage
 from app.models.schemas import (
     ChatRequest, ChatResponse, CodeSearchRequest, CodeSearchResponse, CodeSource,
     DependencyGraphResponse, IndexJobResponse, IndexRepositoryRequest, RepositorySummary,
-    WikiPageDetail, WikiPageSummary, WikiStructureResponse,
+    WikiPageDetail, WikiPageSummary, WikiPageUpdate, WikiStructureResponse,
 )
 from app.services.embedding_client import EmbeddingError, get_embedding_client
 from app.services.indexer import run_index_job
@@ -128,6 +128,27 @@ async def get_wiki_page(repo_id: int, slug: str, session: AsyncSession = Depends
     ).scalar_one_or_none()
     if page is None:
         raise HTTPException(status_code=404, detail="Página no encontrada")
+    return page
+
+
+@router.patch("/repositories/{repo_id}/wiki/{slug}", response_model=WikiPageDetail)
+async def update_wiki_page(
+    repo_id: int,
+    slug: str,
+    payload: WikiPageUpdate,
+    session: AsyncSession = Depends(get_session),
+):
+    """Persists a manual edit to a wiki page's markdown content."""
+    page = (
+        await session.execute(
+            select(WikiPage).where(WikiPage.repository_id == repo_id, WikiPage.slug == slug)
+        )
+    ).scalar_one_or_none()
+    if page is None:
+        raise HTTPException(status_code=404, detail="Página no encontrada")
+    page.content_markdown = payload.content_markdown
+    await session.commit()
+    await session.refresh(page)
     return page
 
 
