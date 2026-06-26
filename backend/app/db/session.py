@@ -21,6 +21,7 @@ _MIGRATIONS = [
     "CREATE INDEX IF NOT EXISTS ix_wiki_pages_repository_id ON wiki_pages (repository_id)",
     "CREATE INDEX IF NOT EXISTS ix_index_jobs_repository_id ON index_jobs (repository_id)",
     "CREATE INDEX IF NOT EXISTS ix_wiki_pages_repo_slug ON wiki_pages (repository_id, slug)",
+    "ALTER TABLE wiki_pages ADD COLUMN source_hash TEXT DEFAULT ''",
 ]
 
 

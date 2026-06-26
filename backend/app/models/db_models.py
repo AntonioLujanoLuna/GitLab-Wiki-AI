@@ -74,6 +74,7 @@ class WikiPage(Base):
     parent_slug: Mapped[str] = mapped_column(String(256), default="")  # para jerarquía en el sidebar
     content_markdown: Mapped[str] = mapped_column(Text, default="")
     source_files: Mapped[list] = mapped_column(JSON, default=list)     # lista de paths usados como fuente
+    source_hash: Mapped[str] = mapped_column(String(64), default="")   # SHA-256 of source content; used for incremental regen
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     repository: Mapped["Repository"] = relationship(back_populates="pages")
