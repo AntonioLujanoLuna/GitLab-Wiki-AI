@@ -6,6 +6,7 @@ Un IndexJob representa una ejecución de indexado (con su estado y progreso).
 Una WikiPage es una página generada del wiki, ligada a un Repository.
 WikiPageRevision rastrea el historial de ediciones para permitir restaurar versiones.
 WikiCache persiste las respuestas de chat para sobrevivir reinicios del servidor.
+GitLabGroup / GroupIndexJob / GroupRepoStatus modelan el soporte de grupos GitLab.
 """
 from datetime import datetime, timezone
 from enum import Enum
@@ -28,6 +29,76 @@ class JobStatus(str, Enum):
     FAILED = "failed"
 
 
+class GroupIndexStatus(str, Enum):
+    PENDING = "pending"
+    DISCOVERING = "discovering"
+    INDEXING = "indexing"
+    GENERATING_OVERVIEW = "generating_overview"
+    DONE = "done"
+    FAILED = "failed"
+
+
+class GitLabGroup(Base):
+    """A GitLab group (or subgroup) whose repositories have been collectively indexed."""
+    __tablename__ = "gitlab_groups"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    gitlab_url: Mapped[str] = mapped_column(String(512), index=True)
+    group_path: Mapped[str] = mapped_column(String(512), index=True)
+    gitlab_group_id: Mapped[str] = mapped_column(String(64), default="")
+    name: Mapped[str] = mapped_column(String(256))
+    description: Mapped[str] = mapped_column(Text, default="")
+    overview_markdown: Mapped[str] = mapped_column(Text, default="")
+    cross_repo_graph: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    group_jobs: Mapped[list["GroupIndexJob"]] = relationship(
+        back_populates="group", cascade="all, delete-orphan"
+    )
+
+
+class GroupIndexJob(Base):
+    """Tracks the progress of indexing all repositories in a GitLab group."""
+    __tablename__ = "group_index_jobs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("gitlab_groups.id"), index=True)
+    status: Mapped[str] = mapped_column(String(32), default=GroupIndexStatus.PENDING.value)
+    total_repos: Mapped[int] = mapped_column(Integer, default=0)
+    completed_repos: Mapped[int] = mapped_column(Integer, default=0)
+    failed_repos: Mapped[int] = mapped_column(Integer, default=0)
+    current_step: Mapped[str] = mapped_column(String(256), default="")
+    error_summary: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    group: Mapped["GitLabGroup"] = relationship(back_populates="group_jobs")
+    repo_statuses: Mapped[list["GroupRepoStatus"]] = relationship(
+        back_populates="group_job", cascade="all, delete-orphan"
+    )
+
+
+class GroupRepoStatus(Base):
+    """Per-repo progress record within a single GroupIndexJob."""
+    __tablename__ = "group_repo_statuses"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    group_job_id: Mapped[int] = mapped_column(ForeignKey("group_index_jobs.id"), index=True)
+    project_path: Mapped[str] = mapped_column(String(512))
+    repository_id: Mapped[int | None] = mapped_column(
+        ForeignKey("repositories.id", ondelete="SET NULL"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(String(32), default="pending")
+    error_message: Mapped[str] = mapped_column(Text, default="")
+
+    group_job: Mapped["GroupIndexJob"] = relationship(back_populates="repo_statuses")
+
+
 class Repository(Base):
     __tablename__ = "repositories"
 
@@ -45,6 +116,10 @@ class Repository(Base):
     # Monorepo metadata populated by structure_analyzer
     is_monorepo: Mapped[bool] = mapped_column(Boolean, default=False)
     workspace_roots: Mapped[list | None] = mapped_column(JSON, nullable=True, default=None)
+    # Optional FK to the GitLab group this repo belongs to (SET NULL on group delete)
+    group_id: Mapped[int | None] = mapped_column(
+        ForeignKey("gitlab_groups.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

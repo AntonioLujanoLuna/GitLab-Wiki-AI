@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { RepositoryBrowser } from "./components/RepositoryBrowser";
 import { ConnectForm } from "./components/ConnectForm";
+import { GroupConnectForm } from "./components/GroupConnectForm";
+import { GroupIndexingProgress } from "./components/GroupIndexingProgress";
+import { GroupWikiView } from "./components/GroupWikiView";
 import { IndexingProgress } from "./components/IndexingProgress";
 import { WikiSidebar } from "./components/WikiSidebar";
 import { WikiPageContent } from "./components/WikiPageContent";
@@ -16,6 +19,9 @@ const VIEW = {
   CONNECT: "connect",
   INDEXING: "indexing",
   WIKI: "wiki",
+  GROUP_CONNECT: "group_connect",
+  GROUP_INDEXING: "group_indexing",
+  GROUP_WIKI: "group_wiki",
 };
 
 function App() {
@@ -46,6 +52,17 @@ function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [graphOpen, setGraphOpen] = useState(false);
 
+  // Group state
+  const [groups, setGroups] = useState([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [groupsError, setGroupsError] = useState("");
+  const [activeGroup, setActiveGroup] = useState(null);
+  const [activeGroupJobId, setActiveGroupJobId] = useState(null);
+  const [activeGroupId, setActiveGroupId] = useState(null);
+  const [reindexGroupPrefill, setReindexGroupPrefill] = useState(null);
+  const [groupSubmitError, setGroupSubmitError] = useState("");
+  const [isGroupSubmitting, setIsGroupSubmitting] = useState(false);
+
   const job = useJobPolling(activeJobId);
 
   useEffect(() => {
@@ -62,13 +79,24 @@ function App() {
     async function load() {
       setBrowseLoading(true);
       setBrowseError("");
+      setGroupsLoading(true);
+      setGroupsError("");
       try {
-        const repos = await api.listRepositories();
-        if (!cancelled) setRepositories(repos);
+        const [repos, grps] = await Promise.all([
+          api.listRepositories(),
+          api.listGroups(),
+        ]);
+        if (!cancelled) {
+          setRepositories(repos);
+          setGroups(grps);
+        }
       } catch (err) {
         if (!cancelled) setBrowseError(err.message || "No se pudo cargar la lista de repositorios.");
       } finally {
-        if (!cancelled) setBrowseLoading(false);
+        if (!cancelled) {
+          setBrowseLoading(false);
+          setGroupsLoading(false);
+        }
       }
     }
 
@@ -112,6 +140,72 @@ function App() {
     setReindexPrefill(repo);
     setSubmitError("");
     setView(VIEW.CONNECT);
+  };
+
+  // ---- Group handlers ----
+
+  const openExistingGroup = async (group) => {
+    try {
+      let detail = null;
+      try {
+        detail = await api.getGroup(group.id);
+        offlineCache.setGroup(group.id, detail);
+      } catch (netErr) {
+        const cached = await offlineCache.getGroup(group.id);
+        if (cached) {
+          detail = cached;
+        } else {
+          throw netErr;
+        }
+      }
+      setActiveGroup(detail);
+      setView(VIEW.GROUP_WIKI);
+    } catch (err) {
+      setGroupsError(err.message || "No se pudo abrir el grupo.");
+    }
+  };
+
+  const handleDeleteGroup = async (groupId) => {
+    await api.deleteGroup(groupId);
+    offlineCache.clearGroup(groupId);
+    setGroups((prev) => prev.filter((g) => g.id !== groupId));
+  };
+
+  const handleReindexGroup = (group) => {
+    offlineCache.clearGroup(group.id);
+    setReindexGroupPrefill(group);
+    setGroupSubmitError("");
+    setView(VIEW.GROUP_CONNECT);
+  };
+
+  const handleGroupConnect = async (payload) => {
+    setIsGroupSubmitting(true);
+    setGroupSubmitError("");
+    try {
+      const res = await api.indexGroup(payload);
+      setActiveGroupJobId(res.job_id);
+      setActiveGroupId(res.group_id);
+      setView(VIEW.GROUP_INDEXING);
+    } catch (err) {
+      setGroupSubmitError(err.message || "No se pudo iniciar el indexado del grupo.");
+    } finally {
+      setIsGroupSubmitting(false);
+    }
+  };
+
+  const handleGroupJobDone = async (job) => {
+    if (job.group_id) {
+      try {
+        const detail = await api.getGroup(job.group_id);
+        offlineCache.setGroup(job.group_id, detail);
+        setActiveGroup(detail);
+        setView(VIEW.GROUP_WIKI);
+      } catch {
+        setView(VIEW.BROWSE);
+      }
+    } else {
+      setView(VIEW.BROWSE);
+    }
   };
 
   const handleConnect = async (payload) => {
@@ -187,6 +281,9 @@ function App() {
     setSubmitError("");
     setSearchOpen(false);
     setGraphOpen(false);
+    setActiveGroup(null);
+    setActiveGroupJobId(null);
+    setActiveGroupId(null);
   };
 
   const handleUpdatePage = async (slug, newMarkdown, preloadedPage = null) => {
@@ -209,6 +306,17 @@ function App() {
         }}
         onDeleteRepository={handleDeleteRepository}
         onReindexRepository={handleReindexRepository}
+        groups={groups}
+        groupsLoading={groupsLoading}
+        groupsError={groupsError}
+        onOpenGroup={openExistingGroup}
+        onNewGroup={() => {
+          setReindexGroupPrefill(null);
+          setGroupSubmitError("");
+          setView(VIEW.GROUP_CONNECT);
+        }}
+        onDeleteGroup={handleDeleteGroup}
+        onReindexGroup={handleReindexGroup}
       />
     );
   }
@@ -227,6 +335,38 @@ function App() {
 
   if (view === VIEW.INDEXING) {
     return <IndexingProgress job={job} projectPath={projectPathLabel} />;
+  }
+
+  if (view === VIEW.GROUP_CONNECT) {
+    return (
+      <GroupConnectForm
+        onSubmit={handleGroupConnect}
+        isSubmitting={isGroupSubmitting}
+        errorMessage={groupSubmitError}
+        onBack={() => setView(VIEW.BROWSE)}
+        prefill={reindexGroupPrefill}
+      />
+    );
+  }
+
+  if (view === VIEW.GROUP_INDEXING) {
+    return (
+      <GroupIndexingProgress
+        groupJobId={activeGroupJobId}
+        groupId={activeGroupId}
+        onDone={handleGroupJobDone}
+      />
+    );
+  }
+
+  if (view === VIEW.GROUP_WIKI && activeGroup) {
+    return (
+      <GroupWikiView
+        group={activeGroup}
+        onReset={handleReset}
+        onOpenRepository={openExistingRepository}
+      />
+    );
   }
 
   // view === VIEW.WIKI

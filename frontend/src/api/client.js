@@ -154,6 +154,86 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ private_token: privateToken }),
     }),
+
+  // ---- Group endpoints ----
+
+  /** Start indexing all repos in a GitLab group. */
+  indexGroup: (payload) =>
+    request("/api/groups/index", { method: "POST", body: JSON.stringify(payload) }),
+
+  listGroups: () => request("/api/groups"),
+
+  getGroup: (groupId) => request(`/api/groups/${groupId}`),
+
+  getGroupJob: (groupId, jobId) => request(`/api/groups/${groupId}/jobs/${jobId}`),
+
+  getGroupWiki: (groupId) => request(`/api/groups/${groupId}/wiki`),
+
+  crossRepoSearch: (groupId, query, topK, repoIds) =>
+    request(`/api/groups/${groupId}/search`, {
+      method: "POST",
+      body: JSON.stringify({ query, top_k: topK ?? 10, repo_ids: repoIds ?? null }),
+    }),
+
+  groupChat: (groupId, question) =>
+    request(`/api/groups/${groupId}/chat`, {
+      method: "POST",
+      body: JSON.stringify({ question }),
+    }),
+
+  streamGroupChat: async function* (groupId, question) {
+    const res = await fetch(`${API_BASE}/api/groups/${groupId}/chat/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new ApiError(body.detail || `Error ${res.status}`, res.status);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let currentEvent = "";
+    let currentData = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (line.startsWith("event: ")) {
+          currentEvent = line.slice(7).trim();
+        } else if (line.startsWith("data: ")) {
+          currentData += (currentData ? "\n" : "") + line.slice(6);
+        } else if (line === "") {
+          if (currentData) {
+            try {
+              const parsed = JSON.parse(currentData);
+              if (currentEvent === "sources") {
+                yield { sources: parsed };
+              } else if (currentEvent === "done") {
+                return;
+              } else if (currentEvent === "error") {
+                throw new ApiError(parsed.message || "Stream error", 500);
+              } else {
+                yield parsed;
+              }
+            } catch (e) {
+              if (e instanceof ApiError) throw e;
+            }
+          }
+          currentEvent = "";
+          currentData = "";
+        }
+      }
+    }
+  },
+
+  getGroupDependencyGraph: (groupId) => request(`/api/groups/${groupId}/dependency-graph`),
+
+  deleteGroup: (groupId) => request(`/api/groups/${groupId}`, { method: "DELETE" }),
 };
 
 export { ApiError };

@@ -159,3 +159,89 @@ class PushToGitLabWikiResponse(BaseModel):
     ok: bool
     pages_pushed: int
     errors: list[str] = []
+
+
+# ---------- Group requests ----------
+
+class IndexGroupRequest(BaseModel):
+    gitlab_url: str = Field(..., min_length=1, max_length=512, description="URL base de la instancia GitLab")
+    group_path: str = Field(..., min_length=1, max_length=512, description="Ruta del grupo, ej. mi-empresa/equipo-a")
+    private_token: str = Field(..., min_length=1, max_length=512, description="PAT con scope read_api, read_repository")
+    force_reindex: bool = Field(default=False, description="Si True, regenera el wiki aunque no haya cambios")
+    include_subgroups: bool = Field(default=True, description="Si True, incluye proyectos de subgrupos")
+
+    @field_validator("gitlab_url")
+    @classmethod
+    def validate_gitlab_url(cls, v: str) -> str:
+        v = v.rstrip("/")
+        if not re.match(r"^https?://", v, re.IGNORECASE):
+            raise ValueError("gitlab_url debe comenzar con http:// o https://")
+        return v
+
+    @field_validator("group_path")
+    @classmethod
+    def validate_group_path(cls, v: str) -> str:
+        v = v.strip("/")
+        if not v or ".." in v:
+            raise ValueError("group_path inválido")
+        return v
+
+
+class CrossRepoSearchRequest(BaseModel):
+    query: str = Field(..., min_length=1, max_length=500)
+    top_k: int = Field(default=10, ge=1, le=50)
+    repo_ids: list[int] | None = Field(default=None, description="Limitar a estos repos; None = todos los del grupo")
+
+
+# ---------- Group responses ----------
+
+class GroupRepoStatusResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    project_path: str
+    repository_id: int | None
+    status: str
+    error_message: str
+
+
+class GroupJobResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    job_id: int
+    group_id: int
+    status: str
+    total_repos: int
+    completed_repos: int
+    failed_repos: int
+    current_step: str
+    error_summary: str = ""
+    repo_statuses: list[GroupRepoStatusResponse] = []
+
+
+class GroupSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    gitlab_url: str
+    group_path: str
+    gitlab_group_id: str
+    name: str
+    description: str
+    updated_at: datetime
+
+
+class GroupDetail(GroupSummary):
+    overview_markdown: str
+    repositories: list[RepositorySummary] = []
+    cross_repo_graph: dict = Field(default_factory=dict)
+
+
+class CrossRepoSearchResult(CodeSource):
+    repository_id: int
+    repository_name: str
+    repository_path: str
+
+
+class CrossRepoSearchResponse(BaseModel):
+    results: list[CrossRepoSearchResult] = []

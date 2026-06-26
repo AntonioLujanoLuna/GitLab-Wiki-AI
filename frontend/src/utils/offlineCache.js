@@ -11,7 +11,7 @@
  */
 
 const DB_NAME = "deepwiki-offline";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -23,6 +23,9 @@ function openDB() {
       }
       if (!db.objectStoreNames.contains("structure")) {
         db.createObjectStore("structure");
+      }
+      if (!db.objectStoreNames.contains("groups")) {
+        db.createObjectStore("groups");
       }
     };
     req.onsuccess = (e) => resolve(e.target.result);
@@ -107,5 +110,20 @@ export const offlineCache = {
       idbDeleteByPrefix("pages", `${repoId}/`),
       idbSet("structure", String(repoId), null),
     ]);
+  },
+
+  /** Retrieve a cached group detail (overview + repos list), or null. */
+  getGroup(groupId) {
+    return idbGet("groups", String(groupId));
+  },
+
+  /** Cache a group detail response. */
+  setGroup(groupId, groupDetail) {
+    return idbSet("groups", String(groupId), groupDetail);
+  },
+
+  /** Invalidate cached group data (called when re-indexing the group). */
+  clearGroup(groupId) {
+    return idbSet("groups", String(groupId), null);
   },
 };

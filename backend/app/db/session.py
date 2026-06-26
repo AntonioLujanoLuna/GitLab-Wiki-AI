@@ -49,6 +49,51 @@ _MIGRATIONS = [
         ")"
     ),
     "CREATE INDEX IF NOT EXISTS ix_wiki_cache_repo ON wiki_cache (repository_id)",
+    # Group support (Path B)
+    (
+        "CREATE TABLE IF NOT EXISTS gitlab_groups ("
+        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  gitlab_url TEXT NOT NULL,"
+        "  group_path TEXT NOT NULL,"
+        "  gitlab_group_id TEXT NOT NULL DEFAULT '',"
+        "  name TEXT NOT NULL,"
+        "  description TEXT NOT NULL DEFAULT '',"
+        "  overview_markdown TEXT NOT NULL DEFAULT '',"
+        "  cross_repo_graph JSON NOT NULL DEFAULT '{}',"
+        "  created_at DATETIME NOT NULL,"
+        "  updated_at DATETIME NOT NULL"
+        ")"
+    ),
+    "CREATE INDEX IF NOT EXISTS ix_gitlab_groups_url ON gitlab_groups (gitlab_url)",
+    "CREATE INDEX IF NOT EXISTS ix_gitlab_groups_path ON gitlab_groups (group_path)",
+    (
+        "CREATE TABLE IF NOT EXISTS group_index_jobs ("
+        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  group_id INTEGER NOT NULL REFERENCES gitlab_groups(id),"
+        "  status TEXT NOT NULL DEFAULT 'pending',"
+        "  total_repos INTEGER NOT NULL DEFAULT 0,"
+        "  completed_repos INTEGER NOT NULL DEFAULT 0,"
+        "  failed_repos INTEGER NOT NULL DEFAULT 0,"
+        "  current_step TEXT NOT NULL DEFAULT '',"
+        "  error_summary TEXT NOT NULL DEFAULT '',"
+        "  created_at DATETIME NOT NULL,"
+        "  finished_at DATETIME"
+        ")"
+    ),
+    "CREATE INDEX IF NOT EXISTS ix_group_index_jobs_group ON group_index_jobs (group_id)",
+    (
+        "CREATE TABLE IF NOT EXISTS group_repo_statuses ("
+        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  group_job_id INTEGER NOT NULL REFERENCES group_index_jobs(id),"
+        "  project_path TEXT NOT NULL,"
+        "  repository_id INTEGER REFERENCES repositories(id) ON DELETE SET NULL,"
+        "  status TEXT NOT NULL DEFAULT 'pending',"
+        "  error_message TEXT NOT NULL DEFAULT ''"
+        ")"
+    ),
+    "CREATE INDEX IF NOT EXISTS ix_group_repo_statuses_job ON group_repo_statuses (group_job_id)",
+    "ALTER TABLE repositories ADD COLUMN group_id INTEGER DEFAULT NULL REFERENCES gitlab_groups(id) ON DELETE SET NULL",
+    "CREATE INDEX IF NOT EXISTS ix_repositories_group ON repositories (group_id)",
 ]
 
 
