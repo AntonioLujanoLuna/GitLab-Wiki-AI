@@ -20,14 +20,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pythonjsonlogger import jsonlogger
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.api.routes import router
 from app.core.config import settings
 from app.core.rate_limit import limiter
 from app.db.session import AsyncSessionLocal, init_db
-from app.models.db_models import IndexJob, JobStatus, Repository
-from app.services.embedding_client import get_embedding_client
+from app.models.db_models import GroupIndexJob, GroupIndexStatus, IndexJob, JobStatus, Repository
+from app.services.embedding_client import close_embedding_client, get_embedding_client
 from app.services.vector_store import VectorStore
 from app.services.wiki_generator import WikiGenerator
 
@@ -112,6 +112,29 @@ async def _staleness_reindex_loop() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    interrupted_at = datetime.now(timezone.utc)
+    async with AsyncSessionLocal() as session:
+        await session.execute(
+            update(IndexJob)
+            .where(IndexJob.status.notin_([JobStatus.DONE.value, JobStatus.FAILED.value]))
+            .values(
+                status=JobStatus.FAILED.value,
+                error_message="Indexing was interrupted by a server restart.",
+                current_step="Interrupted",
+                finished_at=interrupted_at,
+            )
+        )
+        await session.execute(
+            update(GroupIndexJob)
+            .where(GroupIndexJob.status.notin_([GroupIndexStatus.DONE.value, GroupIndexStatus.FAILED.value]))
+            .values(
+                status=GroupIndexStatus.FAILED.value,
+                error_summary="Indexing was interrupted by a server restart.",
+                current_step="Interrupted",
+                finished_at=interrupted_at,
+            )
+        )
+        await session.commit()
     await _warn_unreachable_services()
 
     if settings.gitlab_webhook_secret_required and not settings.gitlab_webhook_secret:
@@ -138,6 +161,7 @@ async def lifespan(app: FastAPI):
     yield
     staleness_task.cancel()
     await app.state.wiki_generator.close()
+    await close_embedding_client()
 
 
 app = FastAPI(

@@ -179,6 +179,13 @@ class GitLabClient:
         )
         return [b["name"] for b in resp.json()]
 
+    async def get_branch_commit_sha(self, project_id: str, branch: str) -> str:
+        """Return the HEAD commit SHA for the exact branch being indexed."""
+        resp = await self._get(
+            f"{self.api_url}/projects/{project_id}/repository/branches/{quote(branch, safe='')}"
+        )
+        return resp.json().get("commit", {}).get("id", "")
+
     async def get_group(self, group_path: str) -> dict:
         """Returns metadata for a GitLab group or subgroup."""
         encoded = quote(group_path, safe="")

@@ -68,6 +68,8 @@ class IndexJobResponse(BaseModel):
     progress: int
     current_step: str
     error_message: str = ""
+    created_at: datetime | None = None
+    finished_at: datetime | None = None
 
 
 class RepositorySummary(BaseModel):
@@ -173,6 +175,10 @@ class DependencyGraphResponse(BaseModel):
 
 class WikiPageUpdate(BaseModel):
     content_markdown: str = Field(..., min_length=0, max_length=500_000)
+
+
+class RegenerateWikiPageRequest(BaseModel):
+    private_token: str = Field(default="", max_length=512)
 
 
 class WikiTextSearchResult(BaseModel):

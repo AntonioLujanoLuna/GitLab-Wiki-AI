@@ -81,7 +81,7 @@ export function ConnectForm({ onSubmit, isSubmitting, errorMessage, onBack, pref
         )}
         <div style={styles.eyebrow}>
           <span style={styles.dot} />
-          atlas / {isReindex ? "reindexar" : "nuevo índice"}
+          DeepWiki · GitLab / {isReindex ? "reindexar" : "nuevo índice"}
         </div>
 
         <h1 style={styles.title}>{isReindex ? "Reindexar repositorio" : "Indexa un repositorio"}</h1>

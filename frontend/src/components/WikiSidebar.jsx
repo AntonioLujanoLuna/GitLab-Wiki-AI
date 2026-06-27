@@ -254,6 +254,9 @@ export function WikiSidebar({
   onOpenSearch,
   onOpenGraph,
   onReindex,
+  onOpenHistory,
+  mobileOpen,
+  onMobileClose,
   theme,
   onToggleTheme,
 }) {
@@ -325,13 +328,14 @@ export function WikiSidebar({
 
   return (
     <>
-    <aside style={styles.sidebar}>
+    <aside style={styles.sidebar} className={`wiki-sidebar${mobileOpen ? " is-open" : ""}`}>
       <div style={styles.repoHeader}>
         <div style={styles.topRow}>
           <button onClick={onReset} style={styles.backBtn} title="Ver todos los repositorios indexados">
             ← mis repos
           </button>
           <div style={{ display: "flex", gap: 4 }}>
+            <button onClick={onMobileClose} style={styles.themeBtn} className="mobile-close-button" aria-label="Cerrar navegación">✕</button>
             <button
               onClick={() => setShowSettings(true)}
               style={styles.themeBtn}
@@ -385,6 +389,9 @@ export function WikiSidebar({
         <button onClick={onOpenGraph} style={styles.actionBtn}>
           ⊞ grafo de dependencias
         </button>
+        <button onClick={onOpenHistory} style={styles.actionBtn}>
+          ◷ historial y frescura
+        </button>
         <div style={styles.exportRow}>
           <a href={exportUrl} download style={styles.exportBtn} title="Descargar como Markdown">
             ↓ .md
@@ -394,8 +401,8 @@ export function WikiSidebar({
           </a>
           <button
             style={styles.exportBtn}
-            title="Imprimir / guardar como PDF"
-            onClick={() => window.open(htmlExportUrl, "_blank")?.print?.()}
+            title="Imprimir la página actual / guardar como PDF"
+            onClick={() => window.print()}
           >
             ⎙ pdf
           </button>

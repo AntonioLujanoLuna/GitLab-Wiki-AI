@@ -1,20 +1,24 @@
-import { useCallback, useEffect, startTransition, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, startTransition, useMemo, useState } from "react";
 
-import { KeyboardShortcutsModal } from "./components/KeyboardShortcutsModal";
 import { RepositoryBrowser } from "./components/RepositoryBrowser";
-import { ConnectForm } from "./components/ConnectForm";
-import { GroupConnectForm } from "./components/GroupConnectForm";
-import { GroupIndexingProgress } from "./components/GroupIndexingProgress";
-import { GroupWikiView } from "./components/GroupWikiView";
-import { IndexingProgress } from "./components/IndexingProgress";
-import { WikiSidebar } from "./components/WikiSidebar";
-import { WikiPageContent } from "./components/WikiPageContent";
-import { AskPanel } from "./components/AskPanel";
-import { CodeSearch } from "./components/CodeSearch";
-import { DependencyGraphView } from "./components/DependencyGraphView";
 import { useJobPolling } from "./hooks/useJobPolling";
 import { api } from "./api/client";
 import { offlineCache } from "./utils/offlineCache";
+
+const lazyNamed = (loader, name) => lazy(() => loader().then((module) => ({ default: module[name] })));
+const KeyboardShortcutsModal = lazyNamed(() => import("./components/KeyboardShortcutsModal"), "KeyboardShortcutsModal");
+const ConnectForm = lazyNamed(() => import("./components/ConnectForm"), "ConnectForm");
+const GroupConnectForm = lazyNamed(() => import("./components/GroupConnectForm"), "GroupConnectForm");
+const GroupIndexingProgress = lazyNamed(() => import("./components/GroupIndexingProgress"), "GroupIndexingProgress");
+const GroupWikiView = lazyNamed(() => import("./components/GroupWikiView"), "GroupWikiView");
+const IndexingProgress = lazyNamed(() => import("./components/IndexingProgress"), "IndexingProgress");
+const WikiSidebar = lazyNamed(() => import("./components/WikiSidebar"), "WikiSidebar");
+const WikiPageContent = lazyNamed(() => import("./components/WikiPageContent"), "WikiPageContent");
+const AskPanel = lazyNamed(() => import("./components/AskPanel"), "AskPanel");
+const CodeSearch = lazyNamed(() => import("./components/CodeSearch"), "CodeSearch");
+const DependencyGraphView = lazyNamed(() => import("./components/DependencyGraphView"), "DependencyGraphView");
+const CommandPalette = lazyNamed(() => import("./components/CommandPalette"), "CommandPalette");
+const JobHistoryPanel = lazyNamed(() => import("./components/JobHistoryPanel"), "JobHistoryPanel");
 
 // ---------------------------------------------------------------------------
 // Page loading skeleton (shown while the first wiki page loads)
@@ -77,23 +81,36 @@ function WikiLayout({
   repository, pages, activeSlug, activePage, pageLoading,
   onSelectPage, onReset, onReindex, onUpdatePage,
   searchOpen, graphOpen, shortcutsOpen, setSearchOpen, setGraphOpen, setShortcutsOpen,
-  theme, onToggleTheme,
+  historyOpen, setHistoryOpen, paletteOpen, setPaletteOpen,
+  theme, onToggleTheme, onRegenerate,
 }) {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const paletteActions = useMemo(() => [
+    { id: "code-search", label: "Buscar en el código", hint: "acción", run: () => setSearchOpen(true) },
+    { id: "graph", label: "Ver grafo de dependencias", hint: "acción", run: () => setGraphOpen(true) },
+    { id: "history", label: "Historial de indexado", hint: "acción", run: () => setHistoryOpen(true) },
+    { id: "print", label: "Imprimir / guardar como PDF", hint: "acción", run: () => window.print() },
+  ], [setGraphOpen, setHistoryOpen, setSearchOpen]);
   return (
-    <div style={{ display: "flex" }}>
+    <div className="wiki-layout">
+      <button className="mobile-menu-button" onClick={() => setMobileNavOpen(true)} aria-label="Abrir navegación">☰</button>
+      {mobileNavOpen && <button className="mobile-nav-backdrop" onClick={() => setMobileNavOpen(false)} aria-label="Cerrar navegación" />}
       <WikiSidebar
         repository={repository}
         pages={pages}
         activeSlug={activeSlug}
-        onSelectPage={onSelectPage}
+        onSelectPage={(slug) => { onSelectPage(slug); setMobileNavOpen(false); }}
         onReset={onReset}
         onOpenSearch={() => setSearchOpen(true)}
         onOpenGraph={() => setGraphOpen(true)}
         onReindex={onReindex}
+        onOpenHistory={() => setHistoryOpen(true)}
+        mobileOpen={mobileNavOpen}
+        onMobileClose={() => setMobileNavOpen(false)}
         theme={theme}
         onToggleTheme={onToggleTheme}
       />
-      <main style={{ flex: 1, height: "100vh", overflowY: "auto", position: "relative" }}>
+      <main className="wiki-main">
         {pageLoading && !activePage && <PageSkeleton />}
         {pageLoading && activePage && (
           <div style={skeletonStyles.loadingBar}>
@@ -104,16 +121,19 @@ function WikiLayout({
           <WikiPageContent
             page={activePage}
             repositoryId={repository?.id}
+            repository={repository}
             onUpdatePage={onUpdatePage}
+            onRegenerate={onRegenerate}
           />
         )}
       </main>
       {repository && (
-        <AskPanel repositoryId={repository.id} ragAvailable={repository.indexed_in_qdrant} />
+        <AskPanel repositoryId={repository.id} repository={repository} ragAvailable={repository.indexed_in_qdrant} />
       )}
       {searchOpen && repository && (
         <CodeSearch
           repositoryId={repository.id}
+          repository={repository}
           ragAvailable={repository.indexed_in_qdrant}
           onClose={() => setSearchOpen(false)}
         />
@@ -124,6 +144,14 @@ function WikiLayout({
       {shortcutsOpen && (
         <KeyboardShortcutsModal onClose={() => setShortcutsOpen(false)} />
       )}
+      {historyOpen && repository && <JobHistoryPanel repository={repository} onClose={() => setHistoryOpen(false)} />}
+      <CommandPalette
+        open={paletteOpen}
+        pages={pages}
+        actions={paletteActions}
+        onSelectPage={onSelectPage}
+        onClose={() => setPaletteOpen(false)}
+      />
     </div>
   );
 }
@@ -148,7 +176,7 @@ const REPOS_PAGE_SIZE = 20;
 // App root — manages shared state and orchestrates view transitions
 // ---------------------------------------------------------------------------
 
-function App() {
+function AppContent() {
   // ---- Theme ----
   const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "dark");
 
@@ -192,6 +220,8 @@ function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [graphOpen, setGraphOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   // ---- Group state ----
   const [groups, setGroups] = useState([]);
@@ -225,15 +255,25 @@ function App() {
       setGroupsLoading(true);
       setGroupsError("");
       try {
-        const [repos, grps] = await Promise.all([
+        const [repoResult, groupResult] = await Promise.allSettled([
           api.listRepositories(0, REPOS_PAGE_SIZE + 1),
           api.listGroups(),
         ]);
         if (!cancelled) {
+          let repos;
+          if (repoResult.status === "fulfilled") {
+            repos = repoResult.value;
+            offlineCache.setRepositories(repos);
+          } else {
+            repos = await offlineCache.getRepositories();
+            if (!repos) throw repoResult.reason;
+            setBrowseError("Servidor no disponible; mostrando repositorios guardados sin conexión.");
+          }
           const hasMore = repos.length > REPOS_PAGE_SIZE;
           setRepositories(hasMore ? repos.slice(0, REPOS_PAGE_SIZE) : repos);
           setHasMoreRepos(hasMore);
-          setGroups(grps);
+          if (groupResult.status === "fulfilled") setGroups(groupResult.value);
+          else setGroupsError(groupResult.reason?.message || "No se pudieron cargar los grupos.");
         }
       } catch (err) {
         if (!cancelled) setBrowseError(err.message || "No se pudo cargar la lista de repositorios.");
@@ -266,7 +306,7 @@ function App() {
   // Reflect the active wiki page in the URL hash for deep-linking and browser history.
   useEffect(() => {
     if (view === VIEW.WIKI && activeSlug) {
-      const next = `#page=${activeSlug}`;
+      const next = `#repo=${repository?.id}&page=${encodeURIComponent(activeSlug)}`;
       if (window.location.hash !== next) {
         // pushState so back/forward navigate between pages
         window.history.pushState(null, "", next);
@@ -274,14 +314,14 @@ function App() {
     } else if (view !== VIEW.WIKI && window.location.hash) {
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
     }
-  }, [view, activeSlug]);
+  }, [view, activeSlug, repository?.id]);
 
   // Restore page from hash when entering the wiki (e.g. after browser forward)
   useEffect(() => {
     if (view !== VIEW.WIKI || !pages.length) return;
-    const match = window.location.hash.match(/^#page=(.+)$/);
-    if (match) {
-      const slug = match[1];
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    const slug = params.get("page");
+    if (slug) {
       if (pages.find((p) => p.slug === slug)) startTransition(() => setActiveSlug(slug));
     }
   }, [view, pages]);
@@ -290,9 +330,9 @@ function App() {
   useEffect(() => {
     if (view !== VIEW.WIKI) return;
     const handler = () => {
-      const match = window.location.hash.match(/^#page=(.+)$/);
-      if (match) {
-        const slug = match[1];
+      const params = new URLSearchParams(window.location.hash.slice(1));
+      const slug = params.get("page");
+      if (slug) {
         if (pages.find((p) => p.slug === slug)) setActiveSlug(slug);
       }
     };
@@ -310,6 +350,12 @@ function App() {
       if (e.key === "?" && !e.altKey && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         setShortcutsOpen((v) => !v);
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((value) => !value);
         return;
       }
 
@@ -352,10 +398,23 @@ function App() {
       setPages(structure.pages);
       setActiveSlug(structure.pages[0]?.slug || null);
       setView(VIEW.WIKI);
+      localStorage.setItem("lastRepoId", String(repo.id));
     } catch (err) {
       setBrowseError(`Error al abrir "${repo.name}": ${err.message || "Error desconocido"}`);
     }
   };
+
+  useEffect(() => {
+    if (view !== VIEW.BROWSE || browseLoading || !repositories.length) return;
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    const requestedId = Number(params.get("repo"));
+    if (!requestedId) return;
+    const requested = repositories.find((repo) => repo.id === requestedId);
+    if (requested) {
+      const timer = window.setTimeout(() => openExistingRepository(requested), 0);
+      return () => window.clearTimeout(timer);
+    }
+  }, [browseLoading, repositories, view]);
 
   const handleDeleteRepository = async (repoId) => {
     await api.deleteRepository(repoId);
@@ -457,6 +516,21 @@ function App() {
     setActivePage(updated);
   };
 
+  const handleRegeneratePage = async (slug) => {
+    try {
+      const updated = await api.regenerateWikiPage(repository.id, slug);
+      offlineCache.setPage(repository.id, slug, updated);
+      setActivePage(updated);
+    } catch (error) {
+      if (error.status !== 400) throw error;
+      const token = window.prompt("GitLab token para regenerar esta página (no se guardará):") || "";
+      if (!token) return;
+      const updated = await api.regenerateWikiPage(repository.id, slug, token);
+      offlineCache.setPage(repository.id, slug, updated);
+      setActivePage(updated);
+    }
+  };
+
   // ---- Group handlers ----
 
   const openExistingGroup = async (group) => {
@@ -552,6 +626,7 @@ function App() {
         }}
         onDeleteGroup={handleDeleteGroup}
         onReindexGroup={handleReindexGroup}
+        onRetry={() => window.location.reload()}
       />
     );
   }
@@ -621,10 +696,19 @@ function App() {
       setSearchOpen={setSearchOpen}
       setGraphOpen={setGraphOpen}
       setShortcutsOpen={setShortcutsOpen}
+      historyOpen={historyOpen}
+      setHistoryOpen={setHistoryOpen}
+      paletteOpen={paletteOpen}
+      setPaletteOpen={setPaletteOpen}
       theme={theme}
       onToggleTheme={toggleTheme}
+      onRegenerate={handleRegeneratePage}
     />
   );
+}
+
+function App() {
+  return <Suspense fallback={<PageSkeleton />}><AppContent /></Suspense>;
 }
 
 export default App;

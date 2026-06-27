@@ -25,7 +25,7 @@ frontend/   React + Vite SPA: connection form, indexing progress, wiki reader
 
 - Python 3.11+
 - Node.js 18+
-- An OpenAI-compatible LLM server for wiki generation and RAG chat (see configuration below)
+- OpenAI-compatible LLM and embedding HTTP endpoints (see configuration below)
 - A GitLab Personal Access Token with `read_api` and `read_repository` scopes
 
 ### Quick start — Docker Compose (recommended)
@@ -74,7 +74,9 @@ The backend uses an **OpenAI-compatible client**, so you can point it at a local
 | `OPENAI_URL` | Base URL of the LLM server | `http://localhost:8000/` |
 | `OPENAI_CHAT_MODEL` | Model name (as exposed by the server) | `qwen2.5-3b-instruct-q4_k_m.gguf` |
 | `OPENAI_API_KEY` | API key (`not-needed` for local servers) | `not-needed` |
-| `EMBEDDING_URL` | Embedding service URL (OpenAI-compatible) | `http://localhost:8080/embed` |
+| `EMBEDDING_URL` | OpenAI-compatible HTTP embedding endpoint | `http://localhost:8080/embed` |
+| `OPENAI_EMBEDDING_MODEL` | Model name sent to the embedding endpoint | `text-embedding-3-small` |
+| `EMBEDDING_API_KEY` | Optional bearer token for embeddings | empty |
 | `QDRANT_HOST` / `QDRANT_PORT` | Qdrant host and port | `localhost` / `6333` |
 | `DATABASE_URL` | SQLAlchemy connection URL | `sqlite+aiosqlite:///./deepwiki.db` |
 | `MAX_FILES_TO_INDEX` | Max files to list per repo | `400` |

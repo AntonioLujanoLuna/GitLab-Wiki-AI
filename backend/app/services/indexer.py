@@ -82,6 +82,7 @@ async def _index_repository(session: AsyncSession, job: IndexJob, repo: Reposito
         await _update_job(session, job, status=JobStatus.CLONING.value, progress=5, step="Conectando con GitLab...")
         project = await client.get_project(project_path)
         target_branch = branch or project.default_branch
+        target_commit_sha = await client.get_branch_commit_sha(project.id, target_branch)
 
         # --- Indexado incremental: si el commit no cambió desde la última vez y ya hay un wiki
         # generado, no hace falta volver a leer todo el árbol ni gastar llamadas al LLM/embeddings.
@@ -92,11 +93,11 @@ async def _index_repository(session: AsyncSession, job: IndexJob, repo: Reposito
             )
         ).scalar()
 
-        if (not force_reindex and previous_sha and previous_sha == project.last_commit_sha
+        if (not force_reindex and previous_sha and previous_sha == target_commit_sha
                 and existing_pages_count > 0):
             await _update_job(
                 session, job, status=JobStatus.DONE.value, progress=100,
-                step=f"Sin cambios desde el último indexado (commit {project.last_commit_sha[:8]}); wiki existente reutilizado.",
+                step=f"Sin cambios desde el último indexado (commit {target_commit_sha[:8]}); wiki existente reutilizado.",
             )
             return
 
@@ -104,7 +105,7 @@ async def _index_repository(session: AsyncSession, job: IndexJob, repo: Reposito
         repo.name = project.name
         repo.description = project.description
         repo.default_branch = target_branch
-        repo.last_commit_sha = project.last_commit_sha
+        repo.last_commit_sha = target_commit_sha
         await session.commit()
 
         # --- 2. Árbol de archivos ---
@@ -327,7 +328,9 @@ async def _index_repository(session: AsyncSession, job: IndexJob, repo: Reposito
                 await _embed_repository_code(
                     files_to_embed, repo.id,
                     full_reset=full_reset,
-                    deleted_paths=deleted_paths if not full_reset else None,
+                    # Remove changed paths before upserting too. Otherwise old trailing
+                    # chunks survive when a changed file becomes shorter.
+                    deleted_paths=(deleted_paths | set(changed_files)) if not full_reset else None,
                 )
                 repo.indexed_in_qdrant = True
 

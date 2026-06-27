@@ -3,11 +3,11 @@
  * Centralises the base URL, error handling, and retry logic (up to 2 retries
  * with exponential backoff on 5xx responses and network failures).
  */
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
 class ApiError extends Error {
-  constructor(message, status) {
-    super(message);
+  constructor(message, status, options = undefined) {
+    super(message, options);
     this.status = status;
   }
 }
@@ -28,11 +28,12 @@ async function request(path, options = {}) {
       });
     } catch (networkErr) {
       if (attempt < MAX_RETRIES) continue;
-      throw networkErr;
+      throw new ApiError("No se pudo conectar con el servidor.", 0, { cause: networkErr });
     }
 
-    // Retry on 5xx, but not on the last attempt
-    if (res.status >= 500 && attempt < MAX_RETRIES) continue;
+    // Only retry idempotent reads. Retrying an indexing/chat POST can duplicate work.
+    const method = (options.method || "GET").toUpperCase();
+    if (res.status >= 500 && attempt < MAX_RETRIES && ["GET", "HEAD"].includes(method)) continue;
 
     if (!res.ok) {
       let detail = `Error ${res.status}`;
@@ -189,7 +190,22 @@ export const api = {
 
   /** Full-text search across all wiki pages for a repository. */
   searchWikiText: (repoId, q) =>
-    request(`/api/repositories/${repoId}/wiki/search?q=${encodeURIComponent(q)}`),
+    request(`/api/repositories/${repoId}/wiki-search?q=${encodeURIComponent(q)}`),
+
+  listRepositoryJobs: (repoId, limit = 20) =>
+    request(`/api/repositories/${repoId}/jobs?limit=${limit}`),
+
+  regenerateWikiPage: (repoId, slug, privateToken = "") =>
+    request(`/api/repositories/${repoId}/wiki/${slug}/regenerate`, {
+      method: "POST",
+      body: JSON.stringify({ private_token: privateToken }),
+    }),
+
+  checkRepositoryStaleness: (repoId, privateToken = "") =>
+    request(`/api/repositories/${repoId}/staleness`, {
+      method: "POST",
+      body: JSON.stringify({ private_token: privateToken }),
+    }),
 
   getServerConfig: () => request("/api/config"),
 

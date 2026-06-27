@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { api } from "../api/client";
 import { languageFromPath } from "../utils/language";
+import { gitLabSourceUrl } from "../utils/gitlab";
+import { HighlightedCode } from "./HighlightedCode";
 
 const MAX_HISTORY_TURNS = 10;
 
@@ -25,7 +25,7 @@ function CopyButton({ text }) {
   );
 }
 
-function SourceExtract({ source }) {
+function SourceExtract({ source, repository }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -38,9 +38,8 @@ function SourceExtract({ source }) {
         </span>
       </button>
       {expanded && (
-        <SyntaxHighlighter
+        <HighlightedCode
           language={languageFromPath(source.file_path)}
-          style={vscDarkPlus}
           showLineNumbers
           startingLineNumber={source.start_line}
           customStyle={{
@@ -52,13 +51,21 @@ function SourceExtract({ source }) {
           }}
         >
           {source.content}
-        </SyntaxHighlighter>
+        </HighlightedCode>
+      )}
+      {gitLabSourceUrl(repository, source.file_path, source.start_line, source.end_line) && (
+        <a
+          href={gitLabSourceUrl(repository, source.file_path, source.start_line, source.end_line)}
+          target="_blank"
+          rel="noreferrer"
+          style={styles.sourceLink}
+        >abrir en GitLab ↗</a>
       )}
     </div>
   );
 }
 
-export function AskPanel({ repositoryId, ragAvailable }) {
+export function AskPanel({ repositoryId, repository, ragAvailable }) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState([]);
@@ -227,7 +234,7 @@ export function AskPanel({ repositoryId, ragAvailable }) {
                   código usado para esta respuesta ({m.sources.length})
                 </div>
                 {m.sources.map((s, si) => (
-                  <SourceExtract key={`${s.file_path}-${si}`} source={s} />
+                  <SourceExtract key={`${s.file_path}-${si}`} source={s} repository={repository} />
                 ))}
               </div>
             )}
@@ -399,6 +406,14 @@ const styles = {
   sourceLines: {
     color: "var(--text-tertiary)",
     flexShrink: 0,
+  },
+  sourceLink: {
+    display: "block",
+    padding: "6px 10px",
+    borderTop: "1px solid var(--border-subtle)",
+    color: "var(--accent-rust)",
+    fontSize: 10.5,
+    textDecoration: "none",
   },
   thinking: {
     background: "var(--bg-elevated-2)",

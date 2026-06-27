@@ -13,14 +13,20 @@ from app.core.config import settings
 from app.models.db_models import WikiCache
 
 
-def cache_key(question: str) -> str:
-    return hashlib.sha256(question.encode()).hexdigest()[:32]
+def cache_key(question: str, history: list[dict] | None = None) -> str:
+    material = json.dumps(
+        {"question": question, "history": history or []},
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(material.encode()).hexdigest()[:32]
 
 
 async def db_cache_get(
-    session: AsyncSession, repo_id: int, question: str
+    session: AsyncSession, repo_id: int, question: str, history: list[dict] | None = None
 ) -> tuple[str, list] | None:
-    q_hash = cache_key(question)
+    q_hash = cache_key(question, history)
     row = (
         await session.execute(
             select(WikiCache).where(
@@ -44,8 +50,9 @@ async def db_cache_set(
     question: str,
     answer: str,
     sources: list,
+    history: list[dict] | None = None,
 ) -> None:
-    q_hash = cache_key(question)
+    q_hash = cache_key(question, history)
     stmt = (
         sqlite_insert(WikiCache)
         .values(

@@ -11,6 +11,8 @@ describe('offlineCache', () => {
     expect(typeof offlineCache.setPage).toBe('function')
     expect(typeof offlineCache.getPage).toBe('function')
     expect(typeof offlineCache.clearRepo).toBe('function')
+    expect(typeof offlineCache.setRepositories).toBe('function')
+    expect(typeof offlineCache.getRepositories).toBe('function')
   })
 
   it('getStructure returns null for an unknown repo without throwing', async () => {

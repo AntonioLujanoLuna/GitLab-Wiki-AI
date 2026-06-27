@@ -8,6 +8,7 @@ export function RepositoryBrowser({
   repositories, loading, errorMessage, onOpenRepository, onNewRepository, onDeleteRepository, onReindexRepository,
   hasMoreRepos, onLoadMoreRepos, loadingMoreRepos,
   groups, groupsLoading, groupsError, onOpenGroup, onNewGroup, onDeleteGroup, onReindexGroup,
+  onRetry,
 }) {
   const [tab, setTab] = useState("repos");
   const [deletingId, setDeletingId] = useState(null);
@@ -15,6 +16,7 @@ export function RepositoryBrowser({
   const handleDelete = async (e, repoId) => {
     e.stopPropagation();
     if (deletingId) return;
+    if (!window.confirm("¿Eliminar este repositorio indexado y su wiki local?")) return;
     setDeletingId(repoId);
     try {
       await onDeleteRepository(repoId);
@@ -29,11 +31,11 @@ export function RepositoryBrowser({
   };
 
   return (
-    <div style={styles.wrapper}>
+    <div style={styles.wrapper} className="repository-browser">
       <div style={styles.card}>
         <div style={styles.eyebrow}>
           <span style={styles.dot} />
-          atlas
+          DeepWiki · GitLab
         </div>
 
         {/* Tab bar */}
@@ -55,7 +57,7 @@ export function RepositoryBrowser({
         {/* ---- Repos tab ---- */}
         {tab === "repos" && (
           <>
-            <div style={styles.headerRow}>
+            <div style={styles.headerRow} className="browser-header-row">
               <h1 style={styles.title}>Repositorios indexados</h1>
               <button onClick={onNewRepository} style={styles.newBtn}>
                 + indexar nuevo repo
@@ -63,7 +65,7 @@ export function RepositoryBrowser({
             </div>
 
             {loading && <p style={styles.hint}>Cargando repositorios…</p>}
-            {errorMessage && <div style={styles.errorBox}>{errorMessage}</div>}
+            {errorMessage && <div style={styles.errorBox}>{errorMessage} {onRetry && <button className="inline-retry" onClick={onRetry}>reintentar</button>}</div>}
 
             {!loading && !errorMessage && repositories.length === 0 && (
               <div style={styles.emptyState}>
@@ -81,7 +83,7 @@ export function RepositoryBrowser({
               <>
                 <ul style={styles.list}>
                   {repositories.map((repo) => (
-                    <li key={repo.id} style={styles.listItem} onClick={() => onOpenRepository(repo)}>
+                    <li key={repo.id} style={styles.listItem} className="repository-list-item" onClick={() => onOpenRepository(repo)}>
                       <div style={styles.itemMain}>
                         <div style={styles.itemName}>{repo.name}</div>
                         <div style={styles.itemPath}>{repo.project_path}</div>
@@ -132,7 +134,7 @@ export function RepositoryBrowser({
         {/* ---- Groups tab ---- */}
         {tab === "groups" && (
           <>
-            <div style={styles.headerRow}>
+            <div style={styles.headerRow} className="browser-header-row">
               <h1 style={styles.title}>Grupos indexados</h1>
               <button onClick={onNewGroup} style={styles.newBtn}>
                 + indexar grupo

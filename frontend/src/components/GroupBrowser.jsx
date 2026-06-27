@@ -9,6 +9,7 @@ export function GroupBrowser({ groups, loading, errorMessage, onOpenGroup, onNew
   const handleDelete = async (e, groupId) => {
     e.stopPropagation();
     if (deletingId) return;
+    if (!window.confirm("¿Eliminar este grupo indexado? Los repositorios se conservarán.")) return;
     setDeletingId(groupId);
     try {
       await onDeleteGroup(groupId);

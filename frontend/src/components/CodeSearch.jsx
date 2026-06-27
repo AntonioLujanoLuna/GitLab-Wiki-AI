@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { api } from "../api/client";
 import { languageFromPath } from "../utils/language";
+import { gitLabSourceUrl } from "../utils/gitlab";
+import { HighlightedCode } from "./HighlightedCode";
 
 function matchingLineNumbers(content, query, startLine) {
   if (!query) return new Set();
@@ -15,7 +15,7 @@ function matchingLineNumbers(content, query, startLine) {
   return matched;
 }
 
-function ResultCard({ result, query }) {
+function ResultCard({ result, query, repository }) {
   const [expanded, setExpanded] = useState(true);
   const matchedLines = matchingLineNumbers(result.content, query, result.start_line);
 
@@ -33,9 +33,8 @@ function ResultCard({ result, query }) {
         <span style={styles.resultScore}>{(result.score * 100).toFixed(0)}%</span>
       </button>
       {expanded && (
-        <SyntaxHighlighter
+        <HighlightedCode
           language={languageFromPath(result.file_path)}
-          style={vscDarkPlus}
           showLineNumbers
           startingLineNumber={result.start_line}
           wrapLines
@@ -47,7 +46,12 @@ function ResultCard({ result, query }) {
           customStyle={{ margin: 0, fontSize: 12, borderTop: "1px solid var(--border-subtle)", borderRadius: 0 }}
         >
           {result.content}
-        </SyntaxHighlighter>
+        </HighlightedCode>
+      )}
+      {gitLabSourceUrl(repository, result.file_path, result.start_line, result.end_line) && (
+        <a href={gitLabSourceUrl(repository, result.file_path, result.start_line, result.end_line)} target="_blank" rel="noreferrer" style={styles.sourceLink}>
+          abrir en GitLab ↗
+        </a>
       )}
     </div>
   );
@@ -58,7 +62,7 @@ function ResultCard({ result, query }) {
  * A diferencia de AskPanel, no llama al LLM — solo recupera y muestra los chunks
  * de código más relevantes, así que la respuesta es instantánea y no genera texto nuevo.
  */
-export function CodeSearch({ repositoryId, ragAvailable, onClose }) {
+export function CodeSearch({ repositoryId, repository, ragAvailable, onClose }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -123,7 +127,7 @@ export function CodeSearch({ repositoryId, ragAvailable, onClose }) {
               )}
               {results?.length === 0 && <p style={styles.hint}>Sin resultados relevantes.</p>}
               {results?.map((r, i) => (
-                <ResultCard key={`${r.file_path}-${i}`} result={r} query={query} />
+                <ResultCard key={`${r.file_path}-${i}`} result={r} query={query} repository={repository} />
               ))}
             </div>
           </>
@@ -279,5 +283,13 @@ const styles = {
     color: "rgba(255,210,0,0.8)",
     flexShrink: 0,
     fontFamily: "var(--font-mono)",
+  },
+  sourceLink: {
+    display: "block",
+    padding: "6px 10px",
+    borderTop: "1px solid var(--border-subtle)",
+    color: "var(--accent-rust)",
+    fontSize: 10.5,
+    textDecoration: "none",
   },
 };

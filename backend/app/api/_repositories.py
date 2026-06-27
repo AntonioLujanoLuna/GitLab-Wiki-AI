@@ -22,6 +22,7 @@ from app.models.db_models import (
 from app.models.schemas import (
     BranchListRequest, DependencyGraphResponse, GitLabWebhookPayload,
     IndexJobResponse, IndexRepositoryRequest, PushToGitLabWikiRequest,
+    RegenerateWikiPageRequest,
     PushToGitLabWikiResponse, RepoGitLabTokenUpdate, RepoPromptOverridesUpdate,
     RepoSystemPromptUpdate, RepoWebhookSecretUpdate, RepoWikiLanguageUpdate,
     RepositorySummary, WikiPageDetail,
@@ -30,6 +31,7 @@ from app.models.schemas import (
 from app.services.gitlab_client import GitLabAuthError, GitLabClient, GitLabNotFoundError
 from app.services.indexer import run_index_job
 from app.services.lock_manager import repo_index_lock
+from app.services.page_regenerator import regenerate_page
 from app.services.vector_store import VectorStore
 from app.services.wiki_exporter import export_wiki_to_markdown
 
@@ -133,7 +135,39 @@ async def get_job_status(job_id: int, session: AsyncSession = Depends(get_sessio
     return IndexJobResponse(
         job_id=job.id, repository_id=job.repository_id, status=job.status,
         progress=job.progress, current_step=job.current_step, error_message=job.error_message,
+        created_at=job.created_at, finished_at=job.finished_at,
     )
+
+
+@router.get("/repositories/{repo_id}/jobs", response_model=list[IndexJobResponse])
+async def list_repository_jobs(
+    repo_id: int,
+    limit: int = Query(20, ge=1, le=100),
+    session: AsyncSession = Depends(get_session),
+):
+    if await session.get(Repository, repo_id) is None:
+        raise HTTPException(status_code=404, detail="Repositorio no encontrado")
+    jobs = (
+        await session.execute(
+            select(IndexJob)
+            .where(IndexJob.repository_id == repo_id)
+            .order_by(IndexJob.created_at.desc())
+            .limit(limit)
+        )
+    ).scalars().all()
+    return [
+        IndexJobResponse(
+            job_id=job.id,
+            repository_id=job.repository_id,
+            status=job.status,
+            progress=job.progress,
+            current_step=job.current_step,
+            error_message=job.error_message,
+            created_at=job.created_at,
+            finished_at=job.finished_at,
+        )
+        for job in jobs
+    ]
 
 
 @router.get("/jobs/{job_id}/stream")
@@ -214,6 +248,87 @@ async def get_wiki_page(repo_id: int, slug: str, session: AsyncSession = Depends
     return page
 
 
+@router.post(
+    "/repositories/{repo_id}/wiki/{slug}/regenerate",
+    response_model=WikiPageDetail,
+)
+@limiter.limit(settings.rate_limit_index)
+async def regenerate_wiki_page(
+    request: Request,
+    repo_id: int,
+    slug: str,
+    payload: RegenerateWikiPageRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    repo = await session.get(Repository, repo_id)
+    if repo is None:
+        raise HTTPException(status_code=404, detail="Repositorio no encontrado")
+    page = (
+        await session.execute(
+            select(WikiPage).where(WikiPage.repository_id == repo_id, WikiPage.slug == slug)
+        )
+    ).scalar_one_or_none()
+    if page is None:
+        raise HTTPException(status_code=404, detail="Página no encontrada")
+    token = payload.private_token or repo.gitlab_token or settings.gitlab_default_token
+    if not token:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide a GitLab token or save one in repository settings first.",
+        )
+    try:
+        regenerated = await regenerate_page(repo, page, token)
+    except GitLabAuthError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except GitLabNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    session.add(
+        WikiPageRevision(
+            wiki_page_id=page.id,
+            content_markdown=page.content_markdown,
+            is_ai_generated=page.is_ai_generated,
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    page.content_markdown = regenerated
+    page.is_ai_generated = True
+    # Force the next full re-index to recalculate reuse against real source hashes.
+    page.source_hash = ""
+    await session.commit()
+    await db_cache_invalidate(session, repo_id)
+    await session.refresh(page)
+    return page
+
+
+@router.post("/repositories/{repo_id}/staleness")
+async def check_repository_staleness(
+    repo_id: int,
+    payload: RegenerateWikiPageRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    repo = await session.get(Repository, repo_id)
+    if repo is None:
+        raise HTTPException(status_code=404, detail="Repositorio no encontrado")
+    token = payload.private_token or repo.gitlab_token or settings.gitlab_default_token
+    if not token:
+        raise HTTPException(status_code=400, detail="A GitLab token is required to check freshness.")
+    try:
+        async with GitLabClient(repo.gitlab_url, token) as client:
+            project = await client.get_project(repo.project_path)
+            remote_sha = await client.get_branch_commit_sha(project.id, repo.default_branch)
+    except GitLabAuthError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    return {
+        "stale": bool(remote_sha and remote_sha != repo.last_commit_sha),
+        "indexed_sha": repo.last_commit_sha,
+        "remote_sha": remote_sha,
+        "branch": repo.default_branch,
+    }
+
+
 @router.patch("/repositories/{repo_id}/wiki/{slug}", response_model=WikiPageDetail)
 async def update_wiki_page(
     repo_id: int,
@@ -241,6 +356,7 @@ async def update_wiki_page(
     page.content_markdown = payload.content_markdown
     page.is_ai_generated = False
     await session.commit()
+    await db_cache_invalidate(session, repo_id)
     await session.refresh(page)
     return page
 
@@ -317,6 +433,7 @@ async def restore_wiki_revision(
     page.content_markdown = revision.content_markdown
     page.is_ai_generated = revision.is_ai_generated
     await session.commit()
+    await db_cache_invalidate(session, repo_id)
     await session.refresh(page)
     return page
 
@@ -380,6 +497,7 @@ async def export_wiki_html(repo_id: int, session: AsyncSession = Depends(get_ses
     )
 
 
+@router.get("/repositories/{repo_id}/wiki-search", response_model=list[WikiTextSearchResult])
 @router.get("/repositories/{repo_id}/wiki/search", response_model=list[WikiTextSearchResult])
 async def search_wiki_text(
     repo_id: int,

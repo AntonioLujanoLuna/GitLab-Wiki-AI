@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Check, Download, History, Pencil, RotateCcw, Upload, X } from "lucide-react";
 import mermaid, { MERMAID_DARK_VARS, MERMAID_LIGHT_VARS } from "../utils/mermaid";
 import { api } from "../api/client";
+import { gitLabSourceUrl } from "../utils/gitlab";
+import { HighlightedCode } from "./HighlightedCode";
 
 // ---------------------------------------------------------------------------
 // Simple line-level diff (no external dep)
@@ -268,9 +268,8 @@ function CodeBlock({ lang, children }) {
       >
         {copied ? <Check size={11} /> : "⎘"}
       </button>
-      <SyntaxHighlighter
+      <HighlightedCode
         language={lang}
-        style={vscDarkPlus}
         customStyle={{
           borderRadius: 8,
           fontSize: 12.5,
@@ -279,7 +278,7 @@ function CodeBlock({ lang, children }) {
         }}
       >
         {children.replace(/\n$/, "")}
-      </SyntaxHighlighter>
+      </HighlightedCode>
     </div>
   );
 }
@@ -493,7 +492,7 @@ function PushToGitLabDialog({ repoId, onClose }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-export function WikiPageContent({ page, repositoryId, onUpdatePage }) {
+export function WikiPageContent({ page, repositoryId, repository, onUpdatePage, onRegenerate }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -550,10 +549,10 @@ export function WikiPageContent({ page, repositoryId, onUpdatePage }) {
   };
 
   return (
-    <article style={styles.article}>
+    <article style={styles.article} className="wiki-article">
       {toast && <Toast message={toast} onHide={hideToast} />}
 
-      <div style={styles.pageHeader}>
+      <div style={styles.pageHeader} className="wiki-page-header">
         <h1 style={styles.h1}>{page.title}</h1>
         <div style={styles.pageActions}>
           {!isEditing && onUpdatePage && (
@@ -570,6 +569,11 @@ export function WikiPageContent({ page, repositoryId, onUpdatePage }) {
                 <Pencil size={14} />
                 Editar
               </button>
+              {page.is_ai_generated && onRegenerate && (
+                <button onClick={() => onRegenerate(page.slug)} style={styles.actionButton} title="Regenerar solo esta página">
+                  <RotateCcw size={14} /> Regenerar
+                </button>
+              )}
             </>
           )}
           {isEditing && (
@@ -640,9 +644,12 @@ export function WikiPageContent({ page, repositoryId, onUpdatePage }) {
         <div style={styles.sourcesBox}>
           <div style={styles.sourcesLabel}>archivos fuente</div>
           <div style={styles.sourcesList}>
-            {page.source_files.map((f) => (
-              <span key={f} style={styles.sourceTag}>{f}</span>
-            ))}
+            {page.source_files.map((f) => {
+              const href = gitLabSourceUrl(repository, f);
+              return href ? (
+                <a key={f} href={href} target="_blank" rel="noreferrer" style={styles.sourceTag}>{f} ↗</a>
+              ) : <span key={f} style={styles.sourceTag}>{f}</span>;
+            })}
           </div>
         </div>
       )}

@@ -3,7 +3,6 @@ Configuración central de la aplicación.
 Todos los valores se pueden sobreescribir con variables de entorno o un archivo .env
 """
 import re
-from pathlib import Path
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -20,6 +19,8 @@ class Settings(BaseSettings):
     # --- Embeddings (servicio propio, contrato OpenAI: {input, model} -> {data:[{embedding}]}) ---
     embedding_url: str = "http://localhost:8080/embed"
     openai_embedding_model: str = "text-embedding-3-small"
+    embedding_api_key: str = ""
+    embedding_timeout_seconds: float = 60.0
     embedding_dimensions: int = 384  # dimensión de text-embedding-3-small; ajustar si tu servicio usa otro modelo
 
     # --- Qdrant (vector store para RAG sobre código) ---
@@ -54,9 +55,6 @@ class Settings(BaseSettings):
     # Concurrent LLM calls during module page generation. Keep low (2-3) for local models
     # that don't pipeline well; raise to 6-10 when using a cloud API.
     max_concurrent_module_generations: int = 3
-
-    # --- Cache local de modelos HuggingFace ---
-    models_cache_dir: str = str(Path.home() / ".cache" / "deepwiki" / "models")
 
     # --- CORS ---
     cors_origins: list[str] = ["*"]

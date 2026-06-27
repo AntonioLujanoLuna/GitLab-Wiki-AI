@@ -11,7 +11,7 @@
  */
 
 const DB_NAME = "deepwiki-offline";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -26,6 +26,9 @@ function openDB() {
       }
       if (!db.objectStoreNames.contains("groups")) {
         db.createObjectStore("groups");
+      }
+      if (!db.objectStoreNames.contains("repositories")) {
+        db.createObjectStore("repositories");
       }
     };
     req.onsuccess = (e) => resolve(e.target.result);
@@ -84,6 +87,13 @@ async function idbDeleteByPrefix(storeName, prefix) {
 }
 
 export const offlineCache = {
+  getRepositories() {
+    return idbGet("repositories", "all");
+  },
+
+  setRepositories(repositories) {
+    return idbSet("repositories", "all", repositories);
+  },
   /** Retrieve a cached wiki page, or null if not cached. */
   getPage(repoId, slug) {
     return idbGet("pages", `${repoId}/${slug}`);

@@ -127,7 +127,8 @@ async def chat_with_repo(
     if repo is None:
         raise HTTPException(status_code=404, detail="Repositorio no encontrado")
 
-    cached = await db_cache_get(session, repo_id, payload.question)
+    history = [m.model_dump() for m in payload.history] if payload.history else None
+    cached = await db_cache_get(session, repo_id, payload.question, history)
     if cached is not None:
         cached_answer, cached_sources = cached
         return ChatResponse(answer=cached_answer, sources=cached_sources)
@@ -158,7 +159,6 @@ async def chat_with_repo(
         except EmbeddingError as e:
             logger.warning("Embedding failed for chat query, using wiki-only context: %s", e)
 
-    history = [m.model_dump() for m in payload.history] if payload.history else None
     try:
         answer = await wiki_generator.answer_question_rag(
             project_name=repo.name,
@@ -181,7 +181,9 @@ async def chat_with_repo(
         )
         for c in retrieved_chunks
     ]
-    await db_cache_set(session, repo_id, payload.question, answer, [s.model_dump() for s in sources])
+    await db_cache_set(
+        session, repo_id, payload.question, answer, [s.model_dump() for s in sources], history
+    )
     return ChatResponse(answer=answer, sources=sources)
 
 
