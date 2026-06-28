@@ -47,7 +47,7 @@ async def build_cross_repo_graph(repo_ids: list[int]) -> dict:
             await session.execute(
                 select(Repository).where(
                     Repository.id.notin_(repo_ids),
-                    Repository.indexed_in_qdrant == True,  # noqa: E712
+                    Repository.indexed_in_qdrant.is_(True),
                 )
             )
         ).scalars().all()

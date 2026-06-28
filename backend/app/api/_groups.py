@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api._deps import get_wiki_generator
 from app.core.config import settings
 from app.core.rate_limit import limiter
 from app.db.session import AsyncSessionLocal, get_session
@@ -30,10 +31,6 @@ from app.services.wiki_generator import WikiGenerator
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-def _get_wiki_generator(request: Request) -> WikiGenerator:
-    return request.app.state.wiki_generator
 
 
 async def _expand_with_external_deps(
@@ -56,7 +53,7 @@ async def _expand_with_external_deps(
             await session.execute(
                 select(Repository.id).where(
                     Repository.name.in_(external_names),
-                    Repository.indexed_in_qdrant == True,  # noqa: E712
+                    Repository.indexed_in_qdrant.is_(True),
                 )
             )
         ).scalars().all()
@@ -311,7 +308,7 @@ async def cross_repo_search(
                 await session.execute(
                     select(Repository.id).where(
                         Repository.id.in_(expanded_ids),
-                        Repository.indexed_in_qdrant == True,  # noqa: E712
+                        Repository.indexed_in_qdrant.is_(True),
                     )
                 )
             ).scalars().all()
@@ -360,7 +357,7 @@ async def group_chat(
     group_id: int,
     payload: ChatRequest,
     session: AsyncSession = Depends(get_session),
-    wiki_generator: WikiGenerator = Depends(_get_wiki_generator),
+    wiki_generator: WikiGenerator = Depends(get_wiki_generator),
 ):
     """RAG chat answering questions across all repositories in the group."""
     group = await session.get(GitLabGroup, group_id)
@@ -382,7 +379,7 @@ async def group_chat(
             await session.execute(
                 select(Repository.id).where(
                     Repository.id.in_(all_repo_ids),
-                    Repository.indexed_in_qdrant == True,  # noqa: E712
+                    Repository.indexed_in_qdrant.is_(True),
                 )
             )
         ).scalars().all()
@@ -438,7 +435,7 @@ async def stream_group_chat(
     group_id: int,
     payload: ChatRequest,
     session: AsyncSession = Depends(get_session),
-    wiki_generator: WikiGenerator = Depends(_get_wiki_generator),
+    wiki_generator: WikiGenerator = Depends(get_wiki_generator),
 ):
     """Streaming SSE version of group RAG chat."""
     group = await session.get(GitLabGroup, group_id)
@@ -460,7 +457,7 @@ async def stream_group_chat(
             await session.execute(
                 select(Repository.id).where(
                     Repository.id.in_(all_ids),
-                    Repository.indexed_in_qdrant == True,  # noqa: E712
+                    Repository.indexed_in_qdrant.is_(True),
                 )
             )
         ).scalars().all()

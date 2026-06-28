@@ -53,7 +53,7 @@ class EmbeddingClient:
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         if not texts:
             return []
-        truncated = [text[:8000] for text in texts]
+        truncated = [text[:settings.embedding_max_input_chars] for text in texts]
         try:
             response = await self._http.post(
                 self.url,
