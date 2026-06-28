@@ -298,6 +298,11 @@ def _sanitize_mermaid_blocks(content: str) -> str:
     return re.sub(r"```mermaid\n(.*?)```", _fix, content, flags=re.DOTALL)
 
 
+_README_BUDGET_CHARS = 4000
+_WIKI_SUMMARY_BUDGET_CHARS = 3000
+_GROUP_WIKI_SUMMARY_BUDGET_CHARS = 2000
+
+
 def _truncate(text: str, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
@@ -476,7 +481,7 @@ class WikiGenerator:
             package_managers=", ".join(structure.package_managers) or "none detected",
             config_files=", ".join(structure.config_files) or "none",
             manifests_context=manifests_context or "(no readable manifests found)",
-            readme=_truncate(readme_content or "(no README)", 4000),
+            readme=_truncate(readme_content or "(no README)", _README_BUDGET_CHARS),
         )
         return _sanitize_mermaid_blocks(await self._ask(prompt, system_prompt_override=system_prompt_override))
 
@@ -493,7 +498,7 @@ class WikiGenerator:
     ) -> str:
         code_context = _format_retrieved_chunks(retrieved_chunks)
         wiki_block = (
-            f"--- WIKI SUMMARY ---\n{_truncate(wiki_summary, 3000)}\n--- END WIKI SUMMARY ---\n\n"
+            f"--- WIKI SUMMARY ---\n{_truncate(wiki_summary, _WIKI_SUMMARY_BUDGET_CHARS)}\n--- END WIKI SUMMARY ---\n\n"
             if wiki_summary else ""
         )
         return self._p["rag_context"].format(
@@ -596,7 +601,7 @@ class WikiGenerator:
     ) -> str:
         code_context = _format_retrieved_chunks(retrieved_chunks)
         wiki_block = (
-            f"--- GROUP WIKI SUMMARY ---\n{_truncate(group_wiki_summary, 2000)}\n--- END ---\n\n"
+            f"--- GROUP WIKI SUMMARY ---\n{_truncate(group_wiki_summary, _GROUP_WIKI_SUMMARY_BUDGET_CHARS)}\n--- END ---\n\n"
             if group_wiki_summary else ""
         )
         template = self._p.get("group_chat_context", _PROMPTS["en"]["group_chat_context"])
@@ -619,7 +624,7 @@ class WikiGenerator:
     ) -> AsyncGenerator[str, None]:
         code_context = _format_retrieved_chunks(retrieved_chunks)
         wiki_block = (
-            f"--- GROUP WIKI SUMMARY ---\n{_truncate(group_wiki_summary, 2000)}\n--- END ---\n\n"
+            f"--- GROUP WIKI SUMMARY ---\n{_truncate(group_wiki_summary, _GROUP_WIKI_SUMMARY_BUDGET_CHARS)}\n--- END ---\n\n"
             if group_wiki_summary else ""
         )
         template = self._p.get("group_chat_context", _PROMPTS["en"]["group_chat_context"])

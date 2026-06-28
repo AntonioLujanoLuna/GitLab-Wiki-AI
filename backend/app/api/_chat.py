@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api._cache import db_cache_get, db_cache_set
+from app.api._deps import get_wiki_generator
 from app.core.config import settings
 from app.core.rate_limit import limiter
 from app.db.session import get_session
@@ -25,10 +26,6 @@ from app.services.wiki_generator import WikiGenerator
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-def _get_wiki_generator(request: Request) -> WikiGenerator:
-    return request.app.state.wiki_generator
 
 
 def _build_wiki_summary(question: str, page_rows: list, budget: int = 4000) -> str:
@@ -121,7 +118,7 @@ async def chat_with_repo(
     repo_id: int,
     payload: ChatRequest,
     session: AsyncSession = Depends(get_session),
-    wiki_generator: WikiGenerator = Depends(_get_wiki_generator),
+    wiki_generator: WikiGenerator = Depends(get_wiki_generator),
 ):
     repo = await session.get(Repository, repo_id)
     if repo is None:
@@ -198,7 +195,7 @@ async def stream_chat_with_repo(
     repo_id: int,
     payload: ChatRequest,
     session: AsyncSession = Depends(get_session),
-    wiki_generator: WikiGenerator = Depends(_get_wiki_generator),
+    wiki_generator: WikiGenerator = Depends(get_wiki_generator),
 ):
     """SSE: emits source chunks, then answer tokens, then a done event."""
     repo = await session.get(Repository, repo_id)

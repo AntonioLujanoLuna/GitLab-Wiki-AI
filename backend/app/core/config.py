@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     embedding_api_key: str = ""
     embedding_timeout_seconds: float = 60.0
     embedding_dimensions: int = 384  # dimensión de text-embedding-3-small; ajustar si tu servicio usa otro modelo
+    embedding_max_input_chars: int = 8000
 
     # --- Qdrant (vector store para RAG sobre código) ---
     qdrant_host: str = "localhost"
