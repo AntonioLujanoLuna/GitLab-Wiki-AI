@@ -58,8 +58,8 @@ def _get_embed_model(model_name: str, device: str, cache_folder: str):
 class EmbeddingClient:
     def __init__(self, model_name: str | None = None, device: str | None = None,
                  cache_folder: str | None = None):
-        #self.model_name = model_name or settings.embedding_model_name
-        #self.device = device or settings.embedding_device
+        # self.model_name = model_name or settings.embedding_model_name
+        # self.device = device or settings.embedding_device
         self.cache_folder = cache_folder or settings.embedding_cache_folder
         self.model_name = "default"
         self.device = "default"
