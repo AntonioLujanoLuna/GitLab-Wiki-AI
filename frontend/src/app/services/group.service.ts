@@ -197,13 +197,7 @@ export class GroupService {
     }
   }
 
-  /** Called when a group indexing job completes. */
-  onGroupJobDone(job: GroupJobResponse): void {
-    this.handleGroupJobDone(job);
-  }
-
-  /** Called when a group indexing job completes. */
-  async handleGroupJobDone(job: GroupJobResponse): Promise<void> {
+  async onGroupJobDone(job: GroupJobResponse): Promise<void> {
     if (job.group_id) {
       try {
         const detail = await firstValueFrom(this.api.getGroup(job.group_id));

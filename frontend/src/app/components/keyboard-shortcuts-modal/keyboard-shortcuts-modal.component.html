@@ -1,5 +1,5 @@
 <div class="overlay" (click)="onOverlayClick()">
-  <div class="modal" role="dialog" aria-modal="true" aria-label="Atajos de teclado" (click)="onModalClick($event)">
+  <div #trapEl class="modal" role="dialog" aria-modal="true" aria-label="Atajos de teclado" (click)="onModalClick($event)">
     <div class="header">
       <span class="title">atajos de teclado</span>
       <button class="close-btn" (click)="close.emit()" title="Cerrar (Esc)">✕</button>

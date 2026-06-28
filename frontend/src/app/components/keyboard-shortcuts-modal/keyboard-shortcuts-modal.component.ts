@@ -4,6 +4,8 @@ import {
   EventEmitter,
   OnDestroy,
   AfterViewInit,
+  ViewChild,
+  ElementRef,
 } from '@angular/core';
 
 interface ShortcutEntry {
@@ -34,13 +36,19 @@ export class KeyboardShortcutsModalComponent implements AfterViewInit, OnDestroy
   readonly shortcuts = SHORTCUTS;
   private trapRef!: HTMLElement;
 
+  @ViewChild('trapEl') set trapEl(el: ElementRef<HTMLElement>) {
+    if (el) {
+      this.trapRef = el.nativeElement;
+      this.trapFocus();
+    }
+  }
+
   private keydownHandler = (e: KeyboardEvent) => {
     if (e.key === 'Escape') this.close.emit();
   };
 
   ngAfterViewInit(): void {
     document.addEventListener('keydown', this.keydownHandler);
-    this.trapFocus();
   }
 
   ngOnDestroy(): void {
