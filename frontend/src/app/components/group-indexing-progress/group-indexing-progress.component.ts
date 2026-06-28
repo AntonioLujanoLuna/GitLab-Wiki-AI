@@ -72,7 +72,8 @@ export class GroupIndexingProgressComponent implements OnInit, OnDestroy {
         }
         this.startPolling(groupId, jobId);
       },
-      error: () => {
+      error: (error: unknown) => {
+        this.job.set(this.failedJob(groupId, jobId, error));
         this.loading.set(false);
       },
     });
@@ -91,10 +92,36 @@ export class GroupIndexingProgressComponent implements OnInit, OnDestroy {
             this.handleDone(updated);
           }
         },
-        error: () => {
-          /* polling continues silently */
+        error: (error: unknown) => {
+          this.job.update((current) =>
+            current
+              ? {
+                  ...current,
+                  status: 'failed',
+                  error_summary: this.errorMessage(error),
+                }
+              : this.failedJob(groupId, jobId, error),
+          );
         },
       });
+  }
+
+  private failedJob(groupId: number, jobId: number, error: unknown): GroupJobResponse {
+    return {
+      job_id: jobId,
+      group_id: groupId,
+      status: 'failed',
+      total_repos: 0,
+      completed_repos: 0,
+      failed_repos: 0,
+      current_step: 'No se pudo consultar el estado del indexado',
+      error_summary: this.errorMessage(error),
+      repo_statuses: [],
+    };
+  }
+
+  private errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : 'Error desconocido';
   }
 
   private isTerminal(status: string): boolean {
