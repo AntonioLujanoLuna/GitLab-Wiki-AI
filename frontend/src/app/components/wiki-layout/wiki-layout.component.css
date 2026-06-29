@@ -2,6 +2,42 @@
   display: block;
 }
 
+/* ---- Breadcrumbs ---- */
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 32px 0;
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  flex-wrap: wrap;
+}
+
+.crumb-link {
+  color: var(--accent-rust);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.crumb-link:hover {
+  text-decoration: underline;
+}
+
+.crumb-static {
+  color: var(--text-tertiary);
+}
+
+.crumb-sep {
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+.crumb-current {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
 /* ---- Page skeleton ---- */
 .page-skeleton {
   max-width: 720px;

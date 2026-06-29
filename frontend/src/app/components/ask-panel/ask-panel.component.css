@@ -275,3 +275,14 @@
 .markdown-body ::ng-deep strong {
   font-weight: 600;
 }
+
+.pulse-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-rust);
+  animation: pulse-dot 1.2s ease-in-out infinite;
+  vertical-align: middle;
+  margin-right: 4px;
+}

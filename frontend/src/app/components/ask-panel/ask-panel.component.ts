@@ -48,6 +48,7 @@ export class AskPanelComponent implements AfterViewChecked, OnDestroy {
 
   private streamSub?: Subscription;
   private abortController?: AbortController;
+  private readonly STORAGE_PREFIX = 'chat_history_';
 
   constructor() {
     const repo = this.repository();
@@ -55,6 +56,39 @@ export class AskPanelComponent implements AfterViewChecked, OnDestroy {
       const r = repo as { id: number; indexed_in_qdrant?: boolean };
       this.repositoryId.set(r.id);
       this.ragAvailable.set(!!r.indexed_in_qdrant);
+      // Restore persisted chat history
+      const saved = this.loadHistory(r.id);
+      if (saved.length > 0) {
+        this.messages.set(saved);
+      }
+    }
+  }
+
+  private storageKey(repoId: number): string {
+    return `${this.STORAGE_PREFIX}${repoId}`;
+  }
+
+  private loadHistory(repoId: number): ChatMessage[] {
+    try {
+      const raw = localStorage.getItem(this.storageKey(repoId));
+      if (raw) {
+        const parsed = JSON.parse(raw) as ChatMessage[];
+        if (Array.isArray(parsed)) return parsed.slice(-50);
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  }
+
+  private saveHistory(): void {
+    const repoId = this.repositoryId();
+    if (!repoId) return;
+    try {
+      const msgs = this.messages().slice(-50);
+      localStorage.setItem(this.storageKey(repoId), JSON.stringify(msgs));
+    } catch {
+      /* localStorage unavailable */
     }
   }
 
@@ -136,6 +170,7 @@ export class AskPanelComponent implements AfterViewChecked, OnDestroy {
               return copy;
             });
             this.loading.set(false);
+            this.saveHistory();
           },
           complete: () => {
             this.messages.update((prev) => {
@@ -147,6 +182,7 @@ export class AskPanelComponent implements AfterViewChecked, OnDestroy {
               return copy;
             });
             this.loading.set(false);
+            this.saveHistory();
           },
         });
     } catch {
@@ -156,6 +192,14 @@ export class AskPanelComponent implements AfterViewChecked, OnDestroy {
 
   onClear(): void {
     this.messages.set([]);
+    const repoId = this.repositoryId();
+    if (repoId) {
+      try {
+        localStorage.removeItem(this.storageKey(repoId));
+      } catch {
+        // ignore
+      }
+    }
   }
 
   markdownToHtml(text: string): SafeHtml {

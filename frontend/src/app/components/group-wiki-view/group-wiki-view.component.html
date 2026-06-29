@@ -42,7 +42,7 @@
           <h1 class="gvw-h1">{{ g.name || g.group_path }}</h1>
           <div class="gvw-markdown">
             @if (g.overview_markdown) {
-              <pre>{{ g.overview_markdown }}</pre>
+              <div class="gvw-markdown-body" [innerHTML]="markdownToHtml(g.overview_markdown)"></div>
             } @else {
               <p><em>No hay contenido generado todavía.</em></p>
             }

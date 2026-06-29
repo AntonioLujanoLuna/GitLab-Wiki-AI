@@ -27,6 +27,21 @@
 
     <!-- Main content area -->
     <main class="wiki-main">
+      <!-- Breadcrumb navigation -->
+      <nav class="breadcrumbs" aria-label="Navegación">
+        @for (crumb of breadcrumbs(); track $index; let last = $last) {
+          @if (!last) {
+            @if (crumb.slug; as slug) {
+              <a class="crumb-link" (click)="onPageClick(slug)">{{ crumb.label }}</a>
+            } @else {
+              <span class="crumb-static">{{ crumb.label }}</span>
+            }
+            <span class="crumb-sep">›</span>
+          } @else {
+            <span class="crumb-current">{{ crumb.label }}</span>
+          }
+        }
+      </nav>
       <!-- Skeleton: loading and no page yet -->
       @if (pageLoading() && !activePage()) {
         <div class="page-skeleton">

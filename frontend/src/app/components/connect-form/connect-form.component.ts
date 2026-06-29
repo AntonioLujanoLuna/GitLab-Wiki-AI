@@ -31,26 +31,39 @@ export class ConnectFormComponent implements OnInit {
   branchesLoading = signal(false);
   branchesError = signal('');
 
+  private readonly DRAFT_KEY = 'connect_form_draft';
+
   constructor(
     public repoService: RepoService,
     private api: ApiService,
     private router: Router,
   ) {
     const prefill = this.repoService.reindexPrefill();
-    this.form = new FormGroup({
-      gitlabUrl: new FormControl(
-        { value: prefill?.gitlab_url || 'https://gitlab.com', disabled: !!prefill },
-        { validators: [Validators.required] },
-      ),
-      projectPath: new FormControl(
-        { value: prefill?.project_path || '', disabled: !!prefill },
-        { validators: [Validators.required] },
-      ),
-      privateToken: new FormControl('', { validators: [Validators.required] }),
-      branch: new FormControl(
-        prefill?.default_branch && prefill.default_branch !== 'main' ? prefill.default_branch : '',
-      ),
-    });
+
+    if (prefill) {
+      this.form = new FormGroup({
+        gitlabUrl: new FormControl(
+          { value: prefill.gitlab_url, disabled: true },
+          { validators: [Validators.required] },
+        ),
+        projectPath: new FormControl(
+          { value: prefill.project_path, disabled: true },
+          { validators: [Validators.required] },
+        ),
+        privateToken: new FormControl('', { validators: [Validators.required] }),
+        branch: new FormControl(
+          prefill?.default_branch && prefill.default_branch !== 'main' ? prefill.default_branch : '',
+        ),
+      });
+    } else {
+      const draft = this.loadDraft();
+      this.form = new FormGroup({
+        gitlabUrl: new FormControl(draft?.['gitlabUrl'] || 'https://gitlab.com', { validators: [Validators.required] }),
+        projectPath: new FormControl(draft?.['projectPath'] || '', { validators: [Validators.required] }),
+        privateToken: new FormControl(draft?.['privateToken'] || '', { validators: [Validators.required] }),
+        branch: new FormControl(draft?.['branch'] || ''),
+      });
+    }
   }
 
   get isReindex(): boolean {
@@ -59,6 +72,37 @@ export class ConnectFormComponent implements OnInit {
 
   ngOnInit(): void {
     this.repoService.submitError.set('');
+
+    if (!this.isReindex) {
+      this.form.valueChanges.subscribe((values) => {
+        try {
+          localStorage.setItem(this.DRAFT_KEY, JSON.stringify(values));
+        } catch {
+          /* localStorage unavailable */
+        }
+      });
+    }
+  }
+
+  private loadDraft(): Record<string, string> | null {
+    try {
+      const raw = localStorage.getItem(this.DRAFT_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch {
+      /* ignore */
+    }
+    return null;
+  }
+
+  private clearDraft(): void {
+    try {
+      localStorage.removeItem(this.DRAFT_KEY);
+    } catch {
+      /* ignore */
+    }
   }
 
   goBack(): void {
@@ -121,6 +165,8 @@ export class ConnectFormComponent implements OnInit {
     if (pathErr) pathCtrl!.setErrors({ custom: pathErr });
     else pathCtrl!.setErrors(null);
     if (urlErr || pathErr || !privateToken.trim()) return;
+
+    this.clearDraft();
 
     this.repoService.handleConnect({
       gitlab_url: gitlabUrl.trim().replace(/\/+$/, ''),

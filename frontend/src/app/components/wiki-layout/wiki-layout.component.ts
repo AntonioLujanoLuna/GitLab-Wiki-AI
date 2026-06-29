@@ -51,6 +51,21 @@ export class WikiLayoutComponent implements OnInit, OnDestroy {
     return r?.name || r?.project_path || '';
   });
 
+  breadcrumbs = computed(() => {
+    const page = this.activePage();
+    const crumbs: Array<{ label: string; slug: string | null }> = [
+      { label: 'Inicio', slug: null },
+    ];
+    if (this.repoName()) {
+      crumbs.push({ label: this.repoName(), slug: null });
+    }
+    if (page) {
+      const p = page as { slug: string; title: string; parent_slug?: string };
+      crumbs.push({ label: p.title, slug: p.slug });
+    }
+    return crumbs;
+  });
+
   // ---- Derived from RepoService signals ----
   repository = this.repoService.repository;
   pages = this.repoService.pages;
