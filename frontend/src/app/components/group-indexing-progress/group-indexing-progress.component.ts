@@ -3,11 +3,12 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription, interval, switchMap, takeWhile } from 'rxjs';
 import { ApiService, type GroupJobResponse } from '../../services/api.service';
 import { GroupService } from '../../services/group.service';
+import { AtlasBrandComponent } from '../atlas-brand/atlas-brand.component';
 
 @Component({
   selector: 'app-group-indexing-progress',
   standalone: true,
-  imports: [],
+  imports: [AtlasBrandComponent],
   templateUrl: './group-indexing-progress.component.html',
   styleUrls: ['./group-indexing-progress.component.css'],
 })
