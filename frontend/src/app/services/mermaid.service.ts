@@ -1,5 +1,6 @@
-import { Injectable } from '@angular/core';
+import { Injectable, effect, inject } from '@angular/core';
 import mermaid from 'mermaid';
+import { ThemeService } from './theme.service';
 
 export const MERMAID_DARK_VARS: Record<string, string> = {
   background: '#201D17',
@@ -39,6 +40,15 @@ export interface MermaidRenderResult {
   providedIn: 'root',
 })
 export class MermaidService {
+  constructor() {
+    const themeService = inject(ThemeService);
+    // Re-init mermaid whenever the app theme changes
+    effect(() => {
+      const t = themeService.theme();
+      this.initialize(t === 'light' ? 'default' : 'dark');
+    });
+  }
+
   /**
    * (Re-)initialize mermaid with the given theme and matching theme variables.
    */

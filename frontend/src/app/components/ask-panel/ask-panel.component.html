@@ -16,23 +16,30 @@
       </div>
     </div>
 
-    @if (!ragAvailable()) {
-      <div class="degraded-banner">
-        búsqueda semántica sobre código no disponible para este repo — las respuestas se
-        basan solo en el wiki generado, sin extractos de código
-      </div>
-    }
-
-    <div #scrollContainer class="messages">
-      @if (messages().length === 0) {
-        <div class="empty-hint">
-          @if (ragAvailable()) {
-            Pregunta algo sobre el código real del proyecto. La respuesta incluye los fragmentos de código exactos usados para generarla.
-          } @else {
-            Pregunta algo sobre la arquitectura, un módulo o cómo ejecutar el proyecto, basado en el wiki ya generado.
-          }
+      @if (!ragAvailable()) {
+        <div class="degraded-banner">
+          búsqueda semántica sobre código no disponible para este repo — las respuestas se
+          basan solo en el wiki generado, sin extractos de código
         </div>
       }
+
+      <div #scrollContainer class="messages" (click)="handleMarkdownClick($event)">
+        @if (messages().length === 0) {
+          <div class="empty-hint">
+            @if (ragAvailable()) {
+              Pregunta algo sobre el código real del proyecto. La respuesta incluye los fragmentos de código exactos usados para generarla.
+            } @else {
+              Pregunta algo sobre la arquitectura, un módulo o cómo ejecutar el proyecto, basado en el wiki ya generado.
+            }
+          </div>
+          <div class="suggestions">
+            @for (s of suggestions; track s) {
+              <button class="suggestion-chip" (click)="useSuggestion(s); inputEl.focus()">
+                {{ s }}
+              </button>
+            }
+          </div>
+        }
 
       @for (m of messages(); track $index) {
         <div class="message-group">
@@ -90,6 +97,7 @@
         #inputEl
         [value]="question()"
         (input)="question.set($any($event.target).value)"
+        (keydown)="handleInputKeydown($event)"
         placeholder="¿cómo se autentican los usuarios?"
         class="input"
         [disabled]="loading()"

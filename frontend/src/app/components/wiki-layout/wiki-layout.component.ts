@@ -9,6 +9,7 @@ import {
   effect,
   EffectRef,
 } from '@angular/core';
+import { ThemeService } from '../../services/theme.service';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { RepoService } from '../../services/repo.service';
@@ -41,6 +42,7 @@ export class WikiLayoutComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   repoService = inject(RepoService);
+  private themeService = inject(ThemeService);
 
   // ---- Local UI state ----
   mobileNavOpen = signal(false);
@@ -200,6 +202,37 @@ export class WikiLayoutComponent implements OnInit, OnDestroy {
     if (e.altKey && e.key === 'ArrowRight') {
       e.preventDefault();
       this.repoService.navigatePage(1);
+      return;
+    }
+
+    // Escape — close the topmost open panel
+    if (e.key === 'Escape' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      if (this.paletteOpen()) {
+        this.repoService.setPaletteOpen(false);
+        return;
+      }
+      if (this.shortcutsOpen()) {
+        this.repoService.setShortcutsOpen(false);
+        return;
+      }
+      if (this.searchOpen()) {
+        this.repoService.setSearchOpen(false);
+        return;
+      }
+      if (this.graphOpen()) {
+        this.repoService.setGraphOpen(false);
+        return;
+      }
+      if (this.historyOpen()) {
+        this.repoService.setHistoryOpen(false);
+        return;
+      }
+    }
+
+    // T — toggle theme
+    if (e.key === 't' && !e.altKey && !e.ctrlKey && !e.metaKey && tag !== 'INPUT') {
+      e.preventDefault();
+      this.themeService.toggleTheme();
       return;
     }
   }

@@ -6,6 +6,7 @@ import {
   ViewChild,
   AfterViewChecked,
   OnDestroy,
+  HostListener,
 } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Subscription } from 'rxjs';
@@ -107,12 +108,41 @@ export class AskPanelComponent implements AfterViewChecked, OnDestroy {
     setTimeout(() => this.inputRef?.nativeElement?.focus(), 50);
   }
 
+  @HostListener('document:keydown', ['$event'])
+  handleGlobalKeys(e: KeyboardEvent): void {
+    if (e.key === 'Escape' && this.open()) {
+      this.open.set(false);
+    }
+  }
+
   onClose(): void {
     this.open.set(false);
   }
 
   onStop(): void {
     this.abortController?.abort();
+  }
+
+  /** Hard-coded follow-up suggestions shown when no messages exist. */
+  readonly suggestions: string[] = [
+    '¿cuál es la arquitectura del proyecto?',
+    '¿cómo se ejecuta el proyecto?',
+    '¿qué tecnologías usa?',
+    '¿cómo se estructuran los módulos?',
+  ];
+
+  /** Insert a suggestion chip text into the input box (or send it directly). */
+  useSuggestion(text: string): void {
+    this.question.set(text);
+  }
+
+  handleInputKeydown(e: KeyboardEvent): void {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      if (this.question().trim() && !this.loading()) {
+        this.onAsk(e);
+      }
+    }
   }
 
   async onAsk(e: Event): Promise<void> {
@@ -203,7 +233,24 @@ export class AskPanelComponent implements AfterViewChecked, OnDestroy {
   }
 
   markdownToHtml(text: string): SafeHtml {
-    let html = text
+    const blocks: string[] = [];
+    const withoutCode = text.replace(
+      /```(\w*)\n([\s\S]*?)```/g,
+      (_, lang, code) => {
+        const escaped = code
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        const langAttr = lang ? ` class="lang-${lang}"` : '';
+        const html =
+          `<div class="code-block-wrap"><button class="code-copy-btn" data-code="${encodeURIComponent(code)}" title="Copiar código">⎘</button>` +
+          `<pre><code${langAttr}>${escaped}</code></pre></div>`;
+        blocks.push(html);
+        return `%%CODEBLOCK_${blocks.length - 1}%%`;
+      },
+    );
+
+    let html = withoutCode
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
@@ -221,6 +268,9 @@ export class AskPanelComponent implements AfterViewChecked, OnDestroy {
 
     html = '<p>' + html + '</p>';
     html = html.replace(/<p>\s*<\/p>/g, '');
+
+    html = html.replace(/%%CODEBLOCK_(\d+)%%/g, (_, id) => blocks[Number(id)] ?? '');
+
     return this.sanitizer.bypassSecurityTrustHtml(html);
   }
 
@@ -228,6 +278,18 @@ export class AskPanelComponent implements AfterViewChecked, OnDestroy {
     try {
       await navigator.clipboard.writeText(text);
     } catch { /* ignore */ }
+  }
+
+  handleMarkdownClick(e: MouseEvent): void {
+    const target = e.target as HTMLElement;
+    const btn = target.closest('.code-copy-btn') as HTMLElement | null;
+    const d = btn?.dataset as Record<string, string> | undefined;
+    if (d?.['code']) {
+      e.preventDefault();
+      e.stopPropagation();
+      const code = decodeURIComponent(d['code']);
+      navigator.clipboard.writeText(code).catch(() => {});
+    }
   }
 
   sourceExpanded = signal<Set<string>>(new Set());

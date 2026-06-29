@@ -13,6 +13,7 @@ import {
 } from '@angular/core';
 import { ApiService, WikiTextSearchResult } from '../../services/api.service';
 import { RepoService } from '../../services/repo.service';
+import { ThemeService } from '../../services/theme.service';
 import { RepoSettingsPanelComponent } from '../repo-settings-panel/repo-settings-panel.component';
 import { AtlasBrandComponent } from '../atlas-brand/atlas-brand.component';
 import { Subject, Subscription, debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
@@ -46,6 +47,7 @@ export class WikiSidebarComponent implements OnInit, OnDestroy {
 
   private api = inject(ApiService);
   repoService = inject(RepoService);
+  themeService = inject(ThemeService);
 
   repository = this.repoService.repository;
   pages = this.repoService.pages;

@@ -286,3 +286,71 @@
   vertical-align: middle;
   margin-right: 4px;
 }
+
+/* ---- Suggestions ---- */
+.suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.suggestion-chip {
+  background: var(--bg-elevated-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.suggestion-chip:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-rust-dim);
+  color: var(--text-primary);
+}
+
+/* ---- Code block copy button ---- */
+.code-block-wrap {
+  position: relative;
+  margin: 8px 0;
+}
+
+.code-copy-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 1;
+}
+
+.code-block-wrap:hover .code-copy-btn {
+  opacity: 0.8;
+}
+
+.code-copy-btn:hover {
+  opacity: 1;
+  color: var(--text-secondary);
+}
+
+.code-block-wrap pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.5;
+}

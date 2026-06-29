@@ -12,6 +12,9 @@
       </button>
       <div class="top-actions">
         <button class="mobile-close-button" (click)="onClose()" aria-label="Cerrar navegación">✕</button>
+        <button class="theme-btn" (click)="themeService.toggleTheme()" title="Alternar tema claro/oscuro">
+          {{ themeService.theme() === 'dark' ? '☀︎' : '☾' }}
+        </button>
         <button class="theme-btn" (click)="showSettings.set(true)" title="Configuración del repositorio (prompt, token webhook)">
           ⚙
         </button>
