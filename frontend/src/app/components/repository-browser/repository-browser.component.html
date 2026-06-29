@@ -1,6 +1,6 @@
 <main class="wrapper">
   <section class="card" aria-labelledby="dashboard-title">
-    <div class="eyebrow"><span class="dot"></span>DeepWiki · GitLab</div>
+    <div class="eyebrow"><app-atlas-brand [size]="18" /></div>
 
     <div class="hero">
       <div>
@@ -69,7 +69,7 @@
 
       @if (!repoService.browseLoading() && !repoService.browseError() && repoService.repositories().length === 0) {
         <div class="emptyState">
-          <div class="emptyIcon" aria-hidden="true">◇</div>
+          <div class="empty-brand-mark"><app-atlas-brand [size]="40" [showText]="false" /></div>
           <h2>Empieza por un repositorio</h2>
           <p>Conecta GitLab para generar un wiki navegable, buscar en el código y conversar con el proyecto.</p>
           <button class="submitBtn" (click)="handleNewRepo()">Indexar mi primer repositorio →</button>

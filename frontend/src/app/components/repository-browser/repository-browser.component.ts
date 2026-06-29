@@ -3,11 +3,12 @@ import { Router } from '@angular/router';
 import { RepoService } from '../../services/repo.service';
 import { GroupService } from '../../services/group.service';
 import { GroupBrowserComponent } from '../group-browser/group-browser.component';
+import { AtlasBrandComponent } from '../atlas-brand/atlas-brand.component';
 import type { RepositorySummary } from '../../services/api.service';
 
 @Component({
   selector: 'app-repository-browser',
-  imports: [GroupBrowserComponent],
+  imports: [GroupBrowserComponent, AtlasBrandComponent],
   templateUrl: './repository-browser.component.html',
   styleUrls: ['./repository-browser.component.css'],
   standalone: true,

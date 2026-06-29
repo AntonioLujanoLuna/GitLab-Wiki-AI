@@ -39,6 +39,8 @@
 .errorBox span { color: var(--text-secondary); font-size: 11px; }
 .emptyState { display: flex; align-items: center; flex-direction: column; padding: 64px 20px; text-align: center; }
 .emptyIcon { display: grid; width: 58px; height: 58px; place-items: center; margin-bottom: 18px; border: 1px solid var(--border-subtle); border-radius: 16px; color: var(--accent-rust); font-size: 28px; }
+.empty-brand-mark { margin-bottom: 16px; opacity: 0.35; }
+.empty-state-icon { margin-bottom: 16px; }
 .emptyState h2, .sectionHeader h2 { margin: 0; color: var(--text-primary); font: 600 25px var(--font-serif); }
 .emptyState p { max-width: 520px; margin: 10px 0 24px; color: var(--text-secondary); font: 15px/1.6 var(--font-serif); }
 .skeletonList { display: flex; flex-direction: column; gap: 9px; margin-top: 24px; }
