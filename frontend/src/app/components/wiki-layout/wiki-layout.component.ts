@@ -184,8 +184,15 @@ export class WikiLayoutComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Cmd/Ctrl+K — toggle command palette
+    // Cmd/Ctrl+K — toggle command palette (search overlay)
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      this.repoService.togglePaletteOpen();
+      return;
+    }
+
+    // Cmd/Ctrl+P — same command palette (VS Code muscle memory)
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
       e.preventDefault();
       this.repoService.togglePaletteOpen();
       return;

@@ -96,65 +96,30 @@
         <div class="no-results">sin resultados para "{{ filter() }}"</div>
       }
     } @else {
-      @if (filteredRoot().length === 0 && filteredModules().length === 0) {
+      @if (filteredTree().length === 0) {
         <div class="no-results">sin resultados</div>
       }
 
-      <div class="nav-group">
-        @for (page of filteredRoot(); track page.slug) {
-          <button
-            class="nav-item"
-            [class.active]="page.slug === activeSlug()"
-            [style.paddingLeft.px]="14"
-            (click)="onSelectPage(page.slug)"
-          >
-            {{ page.title }}
-          </button>
-        }
-      </div>
-
-      @if (filteredModules().length > 0 || (grouped().modules.length > 0 && !filter())) {
-        <div class="nav-section">
-          <button
-            class="section-header"
-            (click)="modulesCollapsed.set(!modulesCollapsed())"
-            [attr.aria-expanded]="!modulesCollapsed()"
-          >
-            <span class="nav-section-label">módulos</span>
-            <span class="collapse-icon">{{ modulesCollapsed() ? '▶' : '▼' }}</span>
-          </button>
-          @if (!modulesCollapsed()) {
-            <div class="nav-group">
-              @for (page of filteredModules(); track page.slug) {
-                <button
-                  class="nav-item"
-                  [class.active]="page.slug === activeSlug()"
-                  [style.paddingLeft.px]="28"
-                  (click)="onSelectPage(page.slug)"
-                >
-                  {{ page.title }}
-                </button>
-              }
-            </div>
+      @for (node of filteredTree(); track node.slug) {
+        <div class="tree-row" [style.paddingLeft.px]="12 + node.depth * 16">
+          @if (node.hasChildren) {
+            <button
+              class="tree-chevron"
+              (click)="toggleCollapse(node.slug)"
+              [attr.aria-label]="node.collapsed ? 'Expandir' : 'Colapsar'"
+            >
+              {{ node.collapsed ? '▶' : '▼' }}
+            </button>
+          } @else {
+            <span class="tree-chevron tree-chevron-empty"></span>
           }
-        </div>
-      }
-
-      @if (filter() && filteredModules().length > 0) {
-        <div class="nav-section">
-          <div class="nav-section-label">módulos</div>
-          <div class="nav-group">
-            @for (page of filteredModules(); track page.slug) {
-              <button
-                class="nav-item"
-                [class.active]="page.slug === activeSlug()"
-                [style.paddingLeft.px]="28"
-                (click)="onSelectPage(page.slug)"
-              >
-                {{ page.title }}
-              </button>
-            }
-          </div>
+          <button
+            class="tree-item"
+            [class.active]="node.slug === activeSlug()"
+            (click)="onSelectPage(node.slug)"
+          >
+            {{ node.title }}
+          </button>
         </div>
       }
     }

@@ -24,10 +24,45 @@ interface PageNav {
   parent_slug: string | null;
 }
 
-function groupPages(pages: PageNav[]) {
-  const root = pages.filter((p) => !p.parent_slug);
-  const modules = pages.filter((p) => p.parent_slug === 'modules');
-  return { root, modules };
+interface FlatTreeNode {
+  slug: string;
+  title: string;
+  depth: number;
+  hasChildren: boolean;
+  collapsed: boolean;
+}
+
+function buildFlatTree(pages: PageNav[], collapsedSet: ReadonlySet<string>, depth = 0, parentSlug?: string): FlatTreeNode[] {
+  const children = pages.filter((p) => {
+    const ps = p.parent_slug || '';
+    return parentSlug ? ps === parentSlug : !ps;
+  }).sort((a, b) => {
+    const aTitle = a.title.toLowerCase();
+    const bTitle = b.title.toLowerCase();
+    return aTitle < bTitle ? -1 : aTitle > bTitle ? 1 : 0;
+  });
+
+  const result: FlatTreeNode[] = [];
+  for (const p of children) {
+    const hasChildren = pages.some((other) => (other.parent_slug || '') === p.slug);
+    const collapsed = collapsedSet.has(p.slug);
+    result.push({
+      slug: p.slug,
+      title: p.title,
+      depth,
+      hasChildren,
+      collapsed,
+    });
+    if (!collapsed && hasChildren) {
+      result.push(...buildFlatTree(pages, collapsedSet, depth + 1, p.slug));
+    }
+  }
+  return result;
+}
+
+function filterTree(nodes: FlatTreeNode[], q: string): FlatTreeNode[] {
+  if (!q) return nodes;
+  return nodes.filter((n) => n.title.toLowerCase().includes(q));
 }
 
 @Component({
@@ -54,7 +89,7 @@ export class WikiSidebarComponent implements OnInit, OnDestroy {
   activeSlug = this.repoService.activeSlug;
 
   filter = signal('');
-  modulesCollapsed = signal(false);
+  collapsedNodes = signal<Set<string>>(new Set());
   showSettings = signal(false);
   wikiSearchResults = signal<WikiTextSearchResult[] | null>(null);
   wikiSearchLoading = signal(false);
@@ -65,16 +100,12 @@ export class WikiSidebarComponent implements OnInit, OnDestroy {
 
   readonly q = computed(() => this.filter().trim().toLowerCase());
 
-  readonly grouped = computed(() => groupPages(this.pages() as unknown as PageNav[]));
-
-  readonly filterPage = (p: PageNav) => !this.q() || p.title.toLowerCase().includes(this.q());
-
-  readonly filteredRoot = computed(() =>
-    this.grouped().root.filter(this.filterPage)
+  readonly flatTree = computed(() =>
+    buildFlatTree(this.pages() as unknown as PageNav[], this.collapsedNodes())
   );
 
-  readonly filteredModules = computed(() =>
-    this.grouped().modules.filter(this.filterPage)
+  readonly filteredTree = computed(() =>
+    filterTree(this.flatTree(), this.q())
   );
 
   readonly displayedResults = computed(() =>
@@ -154,12 +185,26 @@ export class WikiSidebarComponent implements OnInit, OnDestroy {
 
   onFilterChange(value: string): void {
     this.filter.set(value);
-    this.searchSubject.next(value);
+    if (value.trim().length >= 2) {
+      this.searchSubject.next(value);
+    } else {
+      this.wikiSearchResults.set(null);
+    }
   }
 
   onSelectPage(slug: string): void {
     this.repoService.setActiveSlug(slug);
     this.filter.set('');
+  }
+
+  toggleCollapse(slug: string): void {
+    const s = new Set(this.collapsedNodes());
+    if (s.has(slug)) {
+      s.delete(slug);
+    } else {
+      s.add(slug);
+    }
+    this.collapsedNodes.set(s);
   }
 
   onClose(): void {
