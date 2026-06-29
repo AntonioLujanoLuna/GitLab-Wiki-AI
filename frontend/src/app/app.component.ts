@@ -2,17 +2,19 @@ import { Component, signal, inject, OnDestroy } from '@angular/core';
 import { RouterOutlet, Router, NavigationStart, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
+import { ToastContainerComponent } from './components/toast-container/toast-container.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet],
+  imports: [RouterOutlet, ToastContainerComponent],
   template: `
     <div class="app-shell">
       @if (routeLoading()) {
         <div class="route-loading-bar"><div class="route-loading-bar-inner"></div></div>
       }
       <router-outlet />
+      <app-toast-container />
     </div>
   `,
   styles: [`

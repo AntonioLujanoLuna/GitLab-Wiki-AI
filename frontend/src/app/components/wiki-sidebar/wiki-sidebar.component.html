@@ -75,7 +75,16 @@
   </div>
 
   <nav class="nav">
-    @if (displayedResults(); as results) {
+    @if (pages().length === 0 && repository()) {
+      <div class="sidebar-skeleton">
+        <div class="sk-line" style="width: 75%"></div>
+        <div class="sk-line" style="width: 55%"></div>
+        <div class="sk-line" style="width: 85%"></div>
+        <div class="sk-line" style="width: 60%"></div>
+        <div class="sk-line" style="width: 40%"></div>
+      </div>
+    } @else {
+      @if (displayedResults(); as results) {
       @if (results.length > 0) {
         <div class="nav-section">
           <div class="nav-section-label">resultados en el wiki</div>
@@ -122,6 +131,7 @@
           </button>
         </div>
       }
+    }
     }
   </nav>
 

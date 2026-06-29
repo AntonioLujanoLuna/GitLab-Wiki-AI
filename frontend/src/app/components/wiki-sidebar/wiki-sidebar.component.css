@@ -288,6 +288,22 @@
   white-space: normal;
 }
 
+/* ---- Sidebar skeleton ---- */
+.sidebar-skeleton {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sk-line {
+  height: 12px;
+  background: linear-gradient(90deg, var(--bg-elevated-2) 25%, var(--bg-elevated) 50%, var(--bg-elevated-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+
 .key-hint {
   padding: 8px 12px;
   font-size: 10px;
